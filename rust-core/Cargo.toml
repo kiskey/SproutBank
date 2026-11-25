@@ -1,0 +1,20 @@
+[package]
+name = "sproutbank-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "sproutbank_core"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[dependencies]
+uniffi = { version = "0.28", features = ["cli"] }
+serde = { version = "1", features = ["derive"] }
+chrono = "0.4"
+
+[build-dependencies]
+uniffi = { version = "0.28", features = ["build"] }
+
+[dev-dependencies]
+approx = "0.5"
