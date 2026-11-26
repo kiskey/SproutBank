@@ -8,14 +8,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.sproutbank.app.ai.SproutAssistant
 import com.sproutbank.app.data.MarketData
 import com.sproutbank.app.data.Repository
 import com.sproutbank.app.ui.components.LineChart
 import com.sproutbank.app.ui.components.Series
 import com.sproutbank.app.vm.ChildUiState
 import com.sproutbank.app.vm.SproutViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,7 +30,7 @@ fun GrowthScreen(vm: SproutViewModel, state: ChildUiState) {
         when (tab) {
             0 -> ChartsTab(vm, state)
             1 -> SpendImpactTab(vm, state)
-            else -> LearnTab()
+            else -> LearnTab(state)
         }
     }
 }
@@ -130,20 +129,34 @@ private fun SpendImpactTab(vm: SproutViewModel, state: ChildUiState) {
 }
 
 @Composable
-private fun LearnTab() {
+private fun LearnTab(state: ChildUiState) {
+    var question by remember { mutableStateOf("") }
+    val goal = state.goal
+    val answer = remember(question, goal) {
+        if (question.isBlank()) null else SproutAssistant.ask(
+            question,
+            goal?.cashSavedCents ?: 0,
+            goal?.simulatedGrowthCents ?: 0,
+            goal?.targetCents ?: 0,
+            state.active?.goalEtfSymbol ?: "VOO",
+        )
+    }
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ExplainCard("VOO", "S&P 500 index, low fees, broad diversification.")
         ExplainCard("SCHG", "Growth-tilted large caps; more upside, more swing.")
         ExplainCard("VT", "Whole-world market — maximum diversification.")
         ExplainCard("VTI", "Total US market — small + mid + large caps.")
         Card(shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.padding(16.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Ask Sprout 🤖", style = MaterialTheme.typography.titleMedium)
-                Text("Why does spending early cost more than the amount I spend?",
-                    style = MaterialTheme.typography.bodySmall)
-                Text("Because the money you sell loses all future compounding.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 6.dp))
+                OutlinedTextField(
+                    value = question, onValueChange = { question = it },
+                    label = { Text("Ask about spending, ETFs, goals…") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (answer != null) {
+                    Text(answer, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
