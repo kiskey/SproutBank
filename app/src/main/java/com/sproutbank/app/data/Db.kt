@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
     entities = [ChildEntity::class, LedgerEntity::class, SpendRequestEntity::class,
                 ChoreEntity::class, ChoreCompletionEntity::class,
                 SettingsEntity::class, CelebrationEntity::class],
-    version = 4, exportSchema = false,
+    version = 5, exportSchema = false,
 )
 abstract class SproutDb : RoomDatabase() {
     abstract fun children(): ChildDao
@@ -53,10 +53,35 @@ abstract class SproutDb : RoomDatabase() {
                 )
             }
         }
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE ledger ADD COLUMN transactionId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE ledger ADD COLUMN account TEXT NOT NULL DEFAULT 'CASH'")
+                db.execSQL("ALTER TABLE ledger ADD COLUMN reversesId INTEGER")
+                db.execSQL("ALTER TABLE ledger ADD COLUMN idempotencyKey TEXT")
+                db.execSQL("ALTER TABLE ledger ADD COLUMN sourceRequestId INTEGER")
+                db.execSQL("ALTER TABLE ledger ADD COLUMN sourceCompletionId INTEGER")
+
+                // Backfill legacy rows.
+                db.execSQL("UPDATE ledger SET transactionId = 'legacy:' || id")
+                db.execSQL("UPDATE ledger SET idempotencyKey = 'legacy:' || id")
+                db.execSQL("UPDATE ledger SET account = CASE WHEN kind = 'POINTS' THEN 'POINTS' ELSE 'CASH' END")
+                db.execSQL("UPDATE ledger SET kind = 'CREDIT' WHERE kind = 'POINTS'")
+                // Convert spend/redeem to signed negatives.
+                db.execSQL("UPDATE ledger SET amountCents = -amountCents WHERE kind IN ('SPEND', 'REDEEM')")
+
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ledger_transactionId` ON `ledger` (`transactionId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ledger_idempotencyKey` ON `ledger` (`idempotencyKey`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ledger_reversesId` ON `ledger` (`reversesId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ledger_sourceRequestId_account` ON `ledger` (`sourceRequestId`, `account`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ledger_sourceCompletionId_account` ON `ledger` (`sourceCompletionId`, `account`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_ledger_childId_account_timestampMs` ON `ledger` (`childId`, `account`, `timestampMs`)")
+            }
+        }
 
         fun build(ctx: Context): SproutDb {
             val db = Room.databaseBuilder(ctx, SproutDb::class.java, "sprout.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
             CoroutineScope(Dispatchers.IO).launch { seed(db) }
