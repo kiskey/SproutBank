@@ -5,10 +5,17 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import com.sproutbank.app.vm.SproutViewModel
+
+/** The current environmental storybook palette derived from theme + system dark mode. */
+val LocalStorybookPalette = compositionLocalOf<StorybookPalette> {
+    CalmTheme.MEADOW_MINT.storybook(false)
+}
 
 @Composable
 fun SproutTheme(vm: SproutViewModel, content: @Composable () -> Unit) {
@@ -30,5 +37,8 @@ fun SproutTheme(vm: SproutViewModel, content: @Composable () -> Unit) {
         secondary = anim(target.secondary),
         primaryContainer = anim(target.primaryContainer),
     )
-    MaterialTheme(colorScheme = scheme, typography = SproutTypography, content = content)
+    val storybook = CalmTheme.fromId(themeId).storybook(dark)
+    CompositionLocalProvider(LocalStorybookPalette provides storybook) {
+        MaterialTheme(colorScheme = scheme, typography = SproutTypography, content = content)
+    }
 }
