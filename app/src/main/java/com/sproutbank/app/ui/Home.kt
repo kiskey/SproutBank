@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.sproutbank.app.data.Repository
+import com.sproutbank.app.data.SpendRequestEntity
 import com.sproutbank.app.ui.components.*
 import com.sproutbank.app.vm.ChildUiState
 import com.sproutbank.app.vm.SproutViewModel
@@ -98,7 +99,6 @@ private fun greeting(): String {
 private fun HeroBankCard(state: ChildUiState, reduced: Boolean) {
     val scheme = MaterialTheme.colorScheme
     Box(Modifier.fillMaxWidth()) {
-        // Layered shadow under hero card
         Box(
             Modifier
                 .matchParentSize()
@@ -112,7 +112,6 @@ private fun HeroBankCard(state: ChildUiState, reduced: Boolean) {
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         ) {
             Box {
-                // 3D coin & star accent
                 StorybookObject(
                     StorybookObject.COIN,
                     size = 72.dp,
@@ -194,7 +193,7 @@ internal fun GoalBar(label: String, progress: Float, color: Color) {
 }
 
 @Composable
-internal fun RequestStatusRow(req: com.sproutbank.app.data.SpendRequestEntity) {
+internal fun RequestStatusRow(req: SpendRequestEntity) {
     ThemedCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -222,7 +221,7 @@ internal fun RequestStatusRow(req: com.sproutbank.app.data.SpendRequestEntity) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Text(Repository.money(req.amountCents),
+            Text(Repository.requestAmountDisplay(req),
                 style = MaterialTheme.typography.titleSmall)
         }
     }
