@@ -8,8 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.sproutbank.app.data.ChoreEntity
 import com.sproutbank.app.data.Repository
 import com.sproutbank.app.vm.ChoreUiState
@@ -29,12 +29,19 @@ fun ChoreCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            ),
+                        ),
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(chore.emoji, fontSize = 30.sp)
+                StorybookObject(emojiToStorybook(chore.emoji), size = 48.dp)
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
