@@ -28,6 +28,11 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.isReturnDefaultValues = true
+    }
+
     sourceSets["main"].jniLibs.srcDirs("src/main/jniLibs")
     sourceSets["main"].java.srcDirs("build/generated/source/uniffi/main/java")
 }
@@ -63,6 +68,14 @@ dependencies {
     androidTestImplementation("androidx.room:room-testing:2.6.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+
+    // JVM unit tests (Robolectric so Room runs on CI without an emulator)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.test.ext:junit:1.2.1")
+    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 
     // Debug only
     debugImplementation("androidx.compose.ui:ui-tooling")
