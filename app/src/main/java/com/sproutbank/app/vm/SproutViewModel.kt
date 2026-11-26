@@ -54,10 +54,9 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
         _activeChildId,
     ) { kids, ledger, reqs, chores, completions, activeId ->
         val active = kids.firstOrNull { it.id == activeId }
-        val balance = ledger
-            .filter { it.kind != "POINTS" }
-            .sumOf { if (it.kind == "CREDIT" || it.kind == "BONUS") it.amountCents else -it.amountCents }
-        val points = ledger.filter { it.kind == "POINTS" }.sumOf { it.amountCents }
+        // Signed amounts — single source of truth, no per-screen recomputation.
+        val balance = ledger.filter { it.account == "CASH" }.sumOf { it.amountCents }
+        val points = ledger.filter { it.account == "POINTS" }.sumOf { it.amountCents }
         val goal = active?.let { repo.goalProgress(it, ledger) }
         ChildUiState(
             children = kids, active = active, ledger = ledger, requests = reqs,
@@ -76,6 +75,10 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             MarketData.trackedEtfs().forEach { runCatching { MarketData.refresh(it) } }
+        }
+        viewModelScope.launch {
+            runCatching { repo.reconcile() }
+                .onFailure { android.util.Log.e("SproutBank", "Reconcile crashed", it) }
         }
     }
 
@@ -114,18 +117,30 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _activeChildId.value?.let { repo.recordCredit(it, kind, amountCents, note, points) }
         }
+
     fun requestSpend(kind: String, amountCents: Long, title: String) = viewModelScope.launch {
         _activeChildId.value?.let { repo.requestSpend(it, kind, amountCents, title) }
     }
-    fun decideRequest(r: SpendRequestEntity, approved: Boolean, note: String?) =
-        viewModelScope.launch { repo.decideRequest(r, approved, note) }
+
+    fun approveRequest(r: SpendRequestEntity, note: String? = null) = viewModelScope.launch {
+        runCatching { repo.approveRequest(r.id, note) }
+            .onFailure { android.util.Log.w("SproutBank", "approveRequest: ${it.message}") }
+    }
+    fun declineRequest(r: SpendRequestEntity, note: String?) = viewModelScope.launch {
+        runCatching { repo.declineRequest(r.id, note) }
+            .onFailure { android.util.Log.w("SproutBank", "declineRequest: ${it.message}") }
+    }
 
     fun submitChore(chore: ChoreEntity) = viewModelScope.launch { repo.submitChore(chore) }
-    fun decideChore(c: ChoreCompletionEntity, approved: Boolean, note: String?) =
-        viewModelScope.launch {
-            val chore = allChores.value.firstOrNull { it.id == c.choreId } ?: return@launch
-            repo.decideChore(c, chore, approved, note)
-        }
+    fun approveChore(c: ChoreCompletionEntity, note: String? = null) = viewModelScope.launch {
+        runCatching { repo.approveChore(c.id, note) }
+            .onFailure { android.util.Log.w("SproutBank", "approveChore: ${it.message}") }
+    }
+    fun rejectChore(c: ChoreCompletionEntity, note: String?) = viewModelScope.launch {
+        runCatching { repo.rejectChore(c.id, note) }
+            .onFailure { android.util.Log.w("SproutBank", "rejectChore: ${it.message}") }
+    }
+
     fun addChore(childId: Long, title: String, emoji: String, cents: Long, points: Long) =
         viewModelScope.launch {
             repo.addChore(ChoreEntity(childId = childId, title = title, emoji = emoji,
@@ -134,17 +149,6 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addBonus(childId: Long, cents: Long, points: Long, note: String) = viewModelScope.launch {
         repo.recordCredit(childId, "BONUS", cents, note.ifBlank { "Bonus" }, points)
-    }
-
-    fun choreStateOfDate(state: ChildUiState, date: java.time.LocalDate): ChoreUiState {
-        if (date != java.time.LocalDate.now()) return ChoreUiState.AVAILABLE
-        return when {
-            state.completions.any { it.status == "PENDING" } -> ChoreUiState.PENDING
-            state.chores.isNotEmpty() && state.chores.all { c ->
-                state.completions.any { it.choreId == c.id && it.status == "APPROVED" }
-            } -> ChoreUiState.DONE
-            else -> ChoreUiState.AVAILABLE
-        }
     }
 
     fun setChildGoal(child: ChildEntity, name: String, emoji: String, targetCents: Long, etf: String) =
@@ -160,4 +164,17 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
 
     fun spendImpact(etf: String): SpendImpactResult =
         repo.spendImpact(etf, uiState.value.ledger)
+
+    // Exposed so the Parent screen can offer a "Reverse" action.
+    fun reverseTransaction(ledgerId: Long, reason: String) = viewModelScope.launch {
+        runCatching { repo.reverseTransaction(ledgerId, reason) }
+            .onFailure { android.util.Log.w("SproutBank", "reverse: ${it.message}") }
+    }
+
+    fun reconcileNow() = viewModelScope.launch {
+        val report = repo.reconcile()
+        if (!report.isClean) {
+            android.util.Log.e("SproutBank", "Integrity issues: ${report.issues.size}")
+        }
+    }
 }
