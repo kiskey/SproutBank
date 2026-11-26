@@ -24,6 +24,13 @@ data class ChildUiState(
     val pendingCount: Int = 0,
 )
 
+/** Internal container so we can combine up to 5 flows (Kotlin limit) into one. */
+private data class CoreTriple(
+    val kids: List<ChildEntity>,
+    val ledger: List<LedgerEntity>,
+    val reqs: List<SpendRequestEntity>,
+)
+
 class SproutViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = SproutRepository(SproutDb.build(app))
 
@@ -37,32 +44,35 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
 
     val children = repo.children().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    // combine() caps at 5 flows — nest the first three into CoreTriple, then
+    // combine that with chores, completions, and activeId (4 total).
     val uiState: StateFlow<ChildUiState> = combine(
-        children,
+        combine(
+            children,
+            _activeChildId.flatMapLatest { id ->
+                if (id == null) flowOf(emptyList<LedgerEntity>()) else repo.ledger(id)
+            },
+            _activeChildId.flatMapLatest { id ->
+                if (id == null) flowOf(emptyList<SpendRequestEntity>()) else repo.requests(id)
+            },
+        ) { kids, ledger, reqs -> CoreTriple(kids, ledger, reqs) },
         _activeChildId.flatMapLatest { id ->
-            if (id == null) flowOf(emptyList()) else repo.ledger(id)
+            if (id == null) flowOf(emptyList<ChoreEntity>()) else repo.chores(id)
         },
         _activeChildId.flatMapLatest { id ->
-            if (id == null) flowOf(emptyList()) else repo.requests(id)
-        },
-        _activeChildId.flatMapLatest { id ->
-            if (id == null) flowOf(emptyList()) else repo.chores(id)
-        },
-        _activeChildId.flatMapLatest { id ->
-            if (id == null) flowOf(emptyList()) else repo.completions(id)
+            if (id == null) flowOf(emptyList<ChoreCompletionEntity>()) else repo.completions(id)
         },
         _activeChildId,
-    ) { kids, ledger, reqs, chores, completions, activeId ->
-        val active = kids.firstOrNull { it.id == activeId }
-        // Signed amounts — single source of truth, no per-screen recomputation.
-        val balance = ledger.filter { it.account == "CASH" }.sumOf { it.amountCents }
-        val points = ledger.filter { it.account == "POINTS" }.sumOf { it.amountCents }
-        val goal = active?.let { repo.goalProgress(it, ledger) }
+    ) { core, chores, completions, activeId ->
+        val active = core.kids.firstOrNull { it.id == activeId }
+        val balance = core.ledger.filter { it.account == "CASH" }.sumOf { it.amountCents }
+        val points = core.ledger.filter { it.account == "POINTS" }.sumOf { it.amountCents }
+        val goal = active?.let { repo.goalProgress(it, core.ledger) }
         ChildUiState(
-            children = kids, active = active, ledger = ledger, requests = reqs,
+            children = core.kids, active = active, ledger = core.ledger, requests = core.reqs,
             chores = chores, completions = completions,
             goal = goal, balanceCents = balance, points = points,
-            pendingCount = reqs.count { it.status == "PENDING" } +
+            pendingCount = core.reqs.count { it.status == "PENDING" } +
                 completions.count { it.status == "PENDING" },
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, ChildUiState())
@@ -92,6 +102,18 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
             "PENDING" -> ChoreUiState.PENDING
             "APPROVED" -> ChoreUiState.DONE
             "REJECTED" -> ChoreUiState.REJECTED
+            else -> ChoreUiState.AVAILABLE
+        }
+    }
+
+    /** Calendar strip helper — resolves the whole-day state for the given date. */
+    fun choreStateOfDate(state: ChildUiState, date: java.time.LocalDate): ChoreUiState {
+        if (date != java.time.LocalDate.now()) return ChoreUiState.AVAILABLE
+        return when {
+            state.completions.any { it.status == "PENDING" } -> ChoreUiState.PENDING
+            state.chores.isNotEmpty() && state.chores.all { c ->
+                state.completions.any { it.choreId == c.id && it.status == "APPROVED" }
+            } -> ChoreUiState.DONE
             else -> ChoreUiState.AVAILABLE
         }
     }
@@ -165,7 +187,6 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
     fun spendImpact(etf: String): SpendImpactResult =
         repo.spendImpact(etf, uiState.value.ledger)
 
-    // Exposed so the Parent screen can offer a "Reverse" action.
     fun reverseTransaction(ledgerId: Long, reason: String) = viewModelScope.launch {
         runCatching { repo.reverseTransaction(ledgerId, reason) }
             .onFailure { android.util.Log.w("SproutBank", "reverse: ${it.message}") }
