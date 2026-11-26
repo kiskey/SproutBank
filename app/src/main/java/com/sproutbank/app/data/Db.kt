@@ -23,7 +23,8 @@ abstract class SproutDb : RoomDatabase() {
     abstract fun celebrations(): CelebrationDao
 
     companion object {
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        // Public so androidTest's MigrationTestHelper can reference it.
+        val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE children ADD COLUMN goalName TEXT")
                 db.execSQL("ALTER TABLE children ADD COLUMN goalEmoji TEXT NOT NULL DEFAULT '🎯'")
