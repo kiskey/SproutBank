@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.sproutbank.app.theme.CalmTheme
 import com.sproutbank.app.ui.components.*
@@ -134,10 +135,11 @@ fun ProfileScreen(
     }
 }
 
+// Color.toArgb() returns Int; avoids the ULong/Int mismatch from `value shr 32`.
 private fun colorToHex(c: Color): String {
-    val argb = c.value
-    val r = ((argb shr 32) and 0xFF).toInt()
-    val g = ((argb shr 24) and 0xFF).toInt()
-    val b = ((argb shr 16) and 0xFF).toInt()
+    val argb = c.toArgb()
+    val r = (argb shr 16) and 0xFF
+    val g = (argb shr 8) and 0xFF
+    val b = argb and 0xFF
     return "#%02X%02X%02X".format(r, g, b)
 }
