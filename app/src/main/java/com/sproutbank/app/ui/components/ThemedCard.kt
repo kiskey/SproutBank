@@ -1,6 +1,8 @@
 package com.sproutbank.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -15,10 +17,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 
-/**
- * Toy-like layered card: two soft shadow offsets under a gradient-front surface.
- * The public signature is unchanged from before — callers need no edits.
- */
 @Composable
 fun ThemedCard(
     modifier: Modifier = Modifier,
@@ -26,24 +24,22 @@ fun ThemedCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val dark = isSystemInDarkTheme()
     val shape = RoundedCornerShape(24.dp)
 
     Box(modifier) {
-        // Deepest shadow layer
         Box(
             Modifier
                 .matchParentSize()
                 .offset(y = 8.dp)
-                .background(scheme.primary.copy(alpha = 0.10f), shape),
+                .background(scheme.primary.copy(alpha = if (dark) 0.05f else 0.10f), shape),
         )
-        // Mid shadow layer
         Box(
             Modifier
                 .matchParentSize()
                 .offset(y = 4.dp)
-                .background(scheme.primary.copy(alpha = 0.15f), shape),
+                .background(scheme.primary.copy(alpha = if (dark) 0.08f else 0.15f), shape),
         )
-        // Front card
         Box(
             Modifier
                 .shadow(
@@ -60,6 +56,11 @@ fun ThemedCard(
                         )
                     else
                         Brush.verticalGradient(listOf(scheme.surface, scheme.surface)),
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (dark) scheme.outlineVariant.copy(alpha = 0.55f) else scheme.outlineVariant.copy(alpha = 0.35f),
+                    shape = shape,
                 ),
         ) {
             Column(Modifier.padding(20.dp), content = content)
