@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -19,13 +20,11 @@ import com.sproutbank.app.ui.components.ThemedCard
 import com.sproutbank.app.vm.SproutViewModel
 import kotlinx.coroutines.launch
 
-/** Wraps ParentScreen with a PIN gate. */
 @Composable
 fun ParentGate(vm: SproutViewModel, onBack: () -> Unit) {
     var unlocked by remember { mutableStateOf(false) }
     var enteredPin by remember { mutableStateOf("") }
     var storedPin by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         storedPin = vm.getParentPin()
         if (storedPin.isNullOrEmpty()) unlocked = true
@@ -40,7 +39,8 @@ fun ParentGate(vm: SproutViewModel, onBack: () -> Unit) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Enter your 4-digit PIN")
                     OutlinedTextField(
-                        value = enteredPin, onValueChange = { if (it.length <= 4 && it.all(Char::isDigit)) enteredPin = it },
+                        value = enteredPin,
+                        onValueChange = { if (it.length <= 4 && it.all(Char::isDigit)) enteredPin = it },
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         singleLine = true,
@@ -78,14 +78,18 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
     var showBonus by remember { mutableStateOf(false) }
     var showPinSetup by remember { mutableStateOf(false) }
 
-    Scaffold(topBar = {
-        TopAppBar(
-            title = { Text("Parent Hub") },
-            navigationIcon = { TextButton(onClick = onBack) { Text("←") } },
-        )
-    }) { pad ->
+    Scaffold(
+        containerColor = Color.Transparent,
+        topBar = {
+            TopAppBar(
+                title = { Text("Parent Hub") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("←") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            )
+        },
+    ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            TabRow(selectedTabIndex = tab) {
+            TabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
                 listOf("Approvals", "Family", "Settings").forEachIndexed { i, l ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(l) })
                 }
@@ -96,17 +100,24 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item { Text("Needs Your Attention", style = MaterialTheme.typography.titleLarge) }
-                    item { Text("${completions.count { it.status == "PENDING" } + requests.count { it.status == "PENDING" }} items waiting",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    item {
+                        Text(
+                            "${completions.count { it.status == "PENDING" } + requests.count { it.status == "PENDING" }} items waiting",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     item { Text("Chore Approvals", style = MaterialTheme.typography.titleMedium) }
                     items(completions.filter { it.status == "PENDING" }) { c ->
                         val chore = chores.firstOrNull { it.id == c.choreId }
                         if (chore != null) {
                             ThemedCard(Modifier.fillMaxWidth()) {
                                 Text("${chore.emoji} ${chore.title}", style = MaterialTheme.typography.titleSmall)
-                                Text(Repository.money(chore.rewardCents) + if (chore.rewardPoints > 0) " · ${chore.rewardPoints} ⭐" else "",
-                                    style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    Repository.money(chore.rewardCents) +
+                                        if (chore.rewardPoints > 0) " · ${chore.rewardPoints} ⭐" else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(onClick = { vm.decideChore(c, true, null) }) { Text("Approve") }
                                     OutlinedButton(onClick = { rejectChoreTarget = c }) { Text("Reject") }
@@ -141,7 +152,8 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(child.emoji, style = MaterialTheme.typography.headlineMedium)
                                 Spacer(Modifier.width(8.dp))
-                                Text(child.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                Text(child.name, style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.weight(1f))
                                 OutlinedButton(onClick = { goalTarget = child }) {
                                     Text(if (child.goalName == null) "Set Goal" else "Edit Goal")
                                 }
