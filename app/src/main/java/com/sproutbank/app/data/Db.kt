@@ -12,18 +12,20 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [ChildEntity::class, LedgerEntity::class, SpendRequestEntity::class,
+                ChoreEntity::class, ChoreCompletionEntity::class,
                 SettingsEntity::class, CelebrationEntity::class],
-    version = 3, exportSchema = false,
+    version = 4, exportSchema = false,
 )
 abstract class SproutDb : RoomDatabase() {
     abstract fun children(): ChildDao
     abstract fun ledger(): LedgerDao
     abstract fun requests(): SpendRequestDao
+    abstract fun chores(): ChoreDao
+    abstract fun completions(): ChoreCompletionDao
     abstract fun settings(): SettingsDao
     abstract fun celebrations(): CelebrationDao
 
     companion object {
-        // Public so androidTest's MigrationTestHelper can reference it.
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE children ADD COLUMN goalName TEXT")
@@ -32,10 +34,29 @@ abstract class SproutDb : RoomDatabase() {
                 db.execSQL("ALTER TABLE children ADD COLUMN goalEtfSymbol TEXT NOT NULL DEFAULT 'VOO'")
             }
         }
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE children ADD COLUMN avatarBg TEXT NOT NULL DEFAULT '#DDF5EC'")
+                db.execSQL("ALTER TABLE children ADD COLUMN avatarRing TEXT NOT NULL DEFAULT '#0D9488'")
+                db.execSQL("ALTER TABLE settings ADD COLUMN parentPin TEXT NOT NULL DEFAULT ''")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS chores (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "childId INTEGER NOT NULL, title TEXT NOT NULL, emoji TEXT NOT NULL, " +
+                    "rewardCents INTEGER NOT NULL, rewardPoints INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS chore_completions (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, choreId INTEGER NOT NULL, " +
+                    "childId INTEGER NOT NULL, submittedAtMs INTEGER NOT NULL, " +
+                    "status TEXT NOT NULL, decidedAtMs INTEGER, decisionNote TEXT)"
+                )
+            }
+        }
 
         fun build(ctx: Context): SproutDb {
             val db = Room.databaseBuilder(ctx, SproutDb::class.java, "sprout.db")
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
             CoroutineScope(Dispatchers.IO).launch { seed(db) }
@@ -43,16 +64,24 @@ abstract class SproutDb : RoomDatabase() {
         }
 
         private suspend fun seed(db: SproutDb) {
-            val existing = db.children().byId(1)
-            if (existing == null) {
+            if (db.children().byId(1) == null) {
                 db.children().upsert(
                     ChildEntity(
                         id = 1, name = "Mia", emoji = "🦊",
+                        avatarBg = "#DDF5EC", avatarRing = "#0D9488",
                         goalName = "PS5", goalEmoji = "🎮",
                         goalTargetCents = 50_000L, goalEtfSymbol = "VOO",
                     )
                 )
                 db.settings().upsert(SettingsEntity())
+                val defaultChores = listOf(
+                    ChoreEntity(childId = 1, title = "Make My Bed", emoji = "🛏️", rewardCents = 100, rewardPoints = 0),
+                    ChoreEntity(childId = 1, title = "Brush My Teeth", emoji = "🪥", rewardCents = 0, rewardPoints = 10),
+                    ChoreEntity(childId = 1, title = "Read a Book", emoji = "📚", rewardCents = 50, rewardPoints = 5),
+                    ChoreEntity(childId = 1, title = "Feed the Pet", emoji = "🐾", rewardCents = 75, rewardPoints = 0),
+                    ChoreEntity(childId = 1, title = "Water the Plants", emoji = "🪴", rewardCents = 0, rewardPoints = 8),
+                )
+                defaultChores.forEach { db.chores().insert(it) }
             }
         }
     }
