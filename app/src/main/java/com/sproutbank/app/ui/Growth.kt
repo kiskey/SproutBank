@@ -39,10 +39,9 @@ fun GrowthScreen(vm: SproutViewModel, state: ChildUiState) {
 private fun ChartsTab(vm: SproutViewModel, state: ChildUiState) {
     var etf by remember { mutableStateOf("VOO") }
     var range by remember { mutableStateOf("90D") }
-    val series = remember(etf, range, state.ledger) {
+    val series: List<com.sproutbank.app.rust.PortfolioPoint> = remember(etf, range, state.ledger) {
         runCatching {
-            val all = vm.spendImpact(etf).unspent
-            all.takeLast(daysFor(range))
+            vm.spendImpact(etf).unspent.takeLast(daysFor(range))
         }.getOrDefault(emptyList())
     }
     LazyColumn(
@@ -65,22 +64,28 @@ private fun ChartsTab(vm: SproutViewModel, state: ChildUiState) {
         }
         item {
             LineChart(
-                series = listOf(Series(etf, series.map { it.cashValueCents.toFloat() },
-                    MaterialTheme.colorScheme.primary)),
+                series = listOf(
+                    Series(
+                        label = etf,
+                        points = series.map { it.cashValueCents.toFloat() },
+                        color = MaterialTheme.colorScheme.primary,
+                    ),
+                ),
             )
         }
         item {
             Card(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("${etf} Return",
-                        style = MaterialTheme.typography.titleMedium)
-                    val first = series.firstOrNull()?.cashValueCents ?: 0
-                    val last = series.lastOrNull()?.cashValueCents ?: 0
-                    val delta = last - first
-                    Text("${Repository.money(delta)}",
+                    Text("${etf} Return", style = MaterialTheme.typography.titleMedium)
+                    val first: Long = series.firstOrNull()?.cashValueCents ?: 0L
+                    val last: Long = series.lastOrNull()?.cashValueCents ?: 0L
+                    val delta: Long = last - first
+                    Text(
+                        Repository.money(delta),
                         style = MaterialTheme.typography.headlineMedium,
-                        color = if (delta >= 0) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.error)
+                        color = if (delta >= 0L) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.error,
+                    )
                 }
             }
         }
@@ -97,31 +102,42 @@ private fun SpendImpactTab(vm: SproutViewModel, state: ChildUiState) {
         item {
             LineChart(
                 series = listOf(
-                    Series("Original", impact.unspent.map { it.cashValueCents.toFloat() },
-                        MaterialTheme.colorScheme.primary),
-                    Series("After spends", impact.afterSpend.map { it.cashValueCents.toFloat() },
-                        MaterialTheme.colorScheme.secondary),
-                )
+                    Series(
+                        label = "Original",
+                        points = impact.unspent.map { it.cashValueCents.toFloat() },
+                        color = MaterialTheme.colorScheme.primary,
+                    ),
+                    Series(
+                        label = "After spends",
+                        points = impact.afterSpend.map { it.cashValueCents.toFloat() },
+                        color = MaterialTheme.colorScheme.secondary,
+                    ),
+                ),
             )
         }
         item {
             Card(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Opportunity Cost",
-                        style = MaterialTheme.typography.labelMedium)
-                    Text(Repository.money(impact.opportunityCostCents),
+                    Text("Opportunity Cost", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        Repository.money(impact.opportunityCostCents),
                         style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.secondary)
-                    Text("What your early spends gave up in ETF growth.",
-                        style = MaterialTheme.typography.bodySmall)
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                    Text(
+                        "What your early spends gave up in ETF growth.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
         }
         item { Text("Fractional share sales", style = MaterialTheme.typography.titleMedium) }
         items(impact.soldBreakdown) { s ->
             Row(Modifier.fillMaxWidth()) {
-                Text("${s.etfSymbol} · ${"%.4f".format(s.sharesMicro / 1_000_000.0)} sh",
-                    Modifier.weight(1f))
+                Text(
+                    "${s.etfSymbol} · ${"%.4f".format(s.sharesMicro / 1_000_000.0)} sh",
+                    Modifier.weight(1f),
+                )
                 Text(Repository.money(s.cashCents))
             }
         }
@@ -132,13 +148,13 @@ private fun SpendImpactTab(vm: SproutViewModel, state: ChildUiState) {
 private fun LearnTab(state: ChildUiState) {
     var question by remember { mutableStateOf("") }
     val goal = state.goal
-    val answer = remember(question, goal) {
+    val answer: String? = remember(question, goal) {
         if (question.isBlank()) null else SproutAssistant.ask(
-            question,
-            goal?.cashSavedCents ?: 0,
-            goal?.simulatedGrowthCents ?: 0,
-            goal?.targetCents ?: 0,
-            state.active?.goalEtfSymbol ?: "VOO",
+            question = question,
+            goalCashCents = goal?.cashSavedCents ?: 0L,
+            goalGrowthCents = goal?.simulatedGrowthCents ?: 0L,
+            goalTargetCents = goal?.targetCents ?: 0L,
+            etf = state.active?.goalEtfSymbol ?: "VOO",
         )
     }
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -150,7 +166,8 @@ private fun LearnTab(state: ChildUiState) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Ask Sprout 🤖", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
-                    value = question, onValueChange = { question = it },
+                    value = question,
+                    onValueChange = { question = it },
                     label = { Text("Ask about spending, ETFs, goals…") },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -172,6 +189,10 @@ private fun ExplainCard(symbol: String, body: String) {
     }
 }
 
-private fun daysFor(range: String) = when (range) {
-    "7D" -> 7; "30D" -> 30; "90D" -> 90; "1Y" -> 365; else -> 10_000
+private fun daysFor(range: String): Int = when (range) {
+    "7D" -> 7
+    "30D" -> 30
+    "90D" -> 90
+    "1Y" -> 365
+    else -> 10_000
 }
