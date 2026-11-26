@@ -18,7 +18,6 @@ fun SproutTheme(vm: SproutViewModel, content: @Composable () -> Unit) {
     val target = CalmTheme.fromId(themeId).scheme(dark)
     val duration = if (reduced) 0 else 360
 
-    // Animate each semantic slot so palette swaps feel gentle.
     fun anim(c: Color): Color {
         @Suppress("NAME_SHADOWING") val s by animateColorAsState(c, tween(duration), label = "palette")
         return s
@@ -29,6 +28,7 @@ fun SproutTheme(vm: SproutViewModel, content: @Composable () -> Unit) {
         surface = anim(target.surface),
         surfaceVariant = anim(target.surfaceVariant),
         secondary = anim(target.secondary),
+        primaryContainer = anim(target.primaryContainer),
     )
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme, typography = SproutTypography, content = content)
 }
