@@ -81,11 +81,15 @@ val buildRust by tasks.registering(Exec::class) {
 }
 
 val generateBindings by tasks.registering(Exec::class) {
+    dependsOn(buildRust)
     workingDir = rustDir
     commandLine(
         "bash", "-c",
-        "cargo run --bin uniffi-bindgen -- generate --language kotlin " +
+        "mkdir -p ${bindGen.absolutePath} && " +
+        "cargo run --features=uniffi/cli --bin uniffi-bindgen -- generate " +
+        "--language kotlin " +
         "--library target/aarch64-linux-android/release/libsproutbank_core.so " +
+        "--config uniffi.toml " +
         "--out-dir ${bindGen.absolutePath}"
     )
 }
