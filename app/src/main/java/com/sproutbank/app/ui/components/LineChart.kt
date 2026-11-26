@@ -5,9 +5,10 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -16,7 +17,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import kotlin.math.abs
 
 data class Series(val label: String, val points: List<Float>, val color: Color)
 
@@ -28,6 +28,9 @@ fun LineChart(
 ) {
     val all = remember(series) { series.flatMap { it.points } }
     var scrubIndex by remember { mutableStateOf<Int?>(null) }
+    // Capture the outline color outside the Canvas draw scope — MaterialTheme
+    // access is @Composable and must not happen inside a DrawScope lambda.
+    val outlineColor = MaterialTheme.colorScheme.outline
 
     if (all.size < 2) {
         Box(modifier.fillMaxWidth().height(200.dp))
@@ -36,7 +39,10 @@ fun LineChart(
 
     val anim = if (reveal) {
         val a = remember { androidx.compose.animation.core.Animatable(0f) }
-        LaunchedEffect(series) { a.snapTo(0f); a.animateTo(1f, androidx.compose.animation.core.tween(800)) }
+        LaunchedEffect(series) {
+            a.snapTo(0f)
+            a.animateTo(1f, androidx.compose.animation.core.tween(800))
+        }
         a.value
     } else 1f
 
@@ -60,9 +66,11 @@ fun LineChart(
                     )
                 },
         ) {
-            val minV = all.min(); val maxV = all.max()
+            val minV = all.min()
+            val maxV = all.max()
             val span = (maxV - minV).takeIf { it > 0f } ?: 1f
-            val w = size.width; val h = size.height
+            val w = size.width
+            val h = size.height
 
             fun pt(i: Int, v: Float) = Offset(
                 x = w * i.toFloat() / (all.size - 1).coerceAtLeast(1),
@@ -86,8 +94,9 @@ fun LineChart(
             scrubIndex?.let { i ->
                 val x = w * i.toFloat() / (all.size - 1).coerceAtLeast(1)
                 drawLine(
-                    color = MaterialTheme.colorScheme.outline,
-                    start = Offset(x, 0f), end = Offset(x, h),
+                    color = outlineColor,
+                    start = Offset(x, 0f),
+                    end = Offset(x, h),
                     strokeWidth = 2f,
                 )
             }
@@ -98,7 +107,7 @@ fun LineChart(
             Surface(
                 shape = MaterialTheme.shapes.small,
                 tonalElevation = 4.dp,
-                modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart).padding(12.dp),
+                modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
             ) {
                 Column(Modifier.padding(8.dp)) {
                     Text("Point ${i + 1}", style = MaterialTheme.typography.labelSmall)
