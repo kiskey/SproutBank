@@ -59,9 +59,10 @@ fun RewardBankScreen(vm: SproutViewModel, state: ChildUiState) {
                 ThemedCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         StorybookObject(
-                            when (e.kind) {
-                                "CREDIT", "BONUS" -> StorybookObject.COIN
-                                "POINTS" -> StorybookObject.STAR
+                            when {
+                                e.kind == "REVERSAL" -> StorybookObject.SPARKLE
+                                e.account == "POINTS" -> StorybookObject.STAR
+                                e.kind == "CREDIT" || e.kind == "BONUS" -> StorybookObject.COIN
                                 else -> StorybookObject.SHOPPING_BAG
                             },
                             size = 40.dp,
@@ -76,12 +77,12 @@ fun RewardBankScreen(vm: SproutViewModel, state: ChildUiState) {
                             )
                         }
                         Text(
-                            if (e.kind == "POINTS") "${e.amountCents} ⭐"
-                            else Repository.money(if (e.kind == "SPEND" || e.kind == "REDEEM") -e.amountCents else e.amountCents),
+                            Repository.ledgerAmountDisplay(e),
                             style = MaterialTheme.typography.titleSmall,
-                            color = when (e.kind) {
-                                "CREDIT", "BONUS" -> MaterialTheme.colorScheme.primary
-                                "POINTS" -> MaterialTheme.colorScheme.secondary
+                            color = when {
+                                e.kind == "REVERSAL" -> MaterialTheme.colorScheme.tertiary
+                                e.account == "POINTS" -> MaterialTheme.colorScheme.secondary
+                                e.amountCents > 0 -> MaterialTheme.colorScheme.primary
                                 else -> MaterialTheme.colorScheme.onSurface
                             },
                         )
@@ -118,60 +119,4 @@ private fun BankHero(state: ChildUiState, reduced: Boolean) {
             Box {
                 StorybookObject(StorybookObject.PIGGY, size = 84.dp,
                     modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp))
-                Column(Modifier.padding(24.dp)) {
-                    Text("MY MONEY", style = MaterialTheme.typography.labelMedium,
-                        color = scheme.onPrimaryContainer)
-                    Text(Repository.money(state.balanceCents),
-                        style = MaterialTheme.typography.displayMedium,
-                        color = scheme.onPrimaryContainer)
-                    Text("Available to spend or save.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onPrimaryContainer)
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        StorybookObject(StorybookObject.STAR, size = 28.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("${state.points} points", style = MaterialTheme.typography.titleMedium,
-                            color = scheme.onPrimaryContainer)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RequestSpendDialog(
-    onDismiss: () -> Unit,
-    onSubmit: (String, Long, String) -> Unit,
-) {
-    var kind by remember { mutableStateOf("SPEND") }
-    var title by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    val cents = (amount.toDoubleOrNull()?.times(100) ?: 0.0).toLong()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("What would you like to spend on?") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = kind == "SPEND", onClick = { kind = "SPEND" }, label = { Text("Spend") })
-                    FilterChip(selected = kind == "REDEEM", onClick = { kind = "REDEEM" }, label = { Text("Redeem") })
-                }
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Item name") }, singleLine = true)
-                OutlinedTextField(
-                    value = amount, onValueChange = { amount = it },
-                    label = { Text("Amount (USD)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                )
-                if (cents > 0) Text("You're asking to spend ${Repository.money(cents)}.")
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = cents > 0 && title.isNotBlank(),
-                onClick = { onSubmit(kind, cents, title) }) { Text("Send Request") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
+                Column(Modifier.padding
