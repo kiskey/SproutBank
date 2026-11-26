@@ -4,8 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -18,6 +18,7 @@ import com.sproutbank.app.data.Repository
 import com.sproutbank.app.ui.components.AvatarCircle
 import com.sproutbank.app.ui.components.Sprout
 import com.sproutbank.app.ui.components.SproutMood
+import com.sproutbank.app.ui.components.ThemedCard
 import com.sproutbank.app.ui.components.tactileClickable
 import com.sproutbank.app.vm.SproutViewModel
 
@@ -68,15 +69,13 @@ private fun ProfileCard(
     reduced: Boolean,
     onClick: () -> Unit,
 ) {
-    Card(
-        shape = RoundedCornerShape(24.dp),
+    ThemedCard(
         modifier = Modifier
             .fillMaxWidth()
             .tactileClickable(reduced = reduced, onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Column(
-            Modifier.padding(20.dp).fillMaxWidth(),
+            Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AvatarCircle(
