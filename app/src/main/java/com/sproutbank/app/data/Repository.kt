@@ -3,6 +3,14 @@ package com.sproutbank.app.data
 import com.sproutbank.app.rust.*
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Stateless helpers used by UI layers (e.g. `Repository.money(...)`).
+ * The stateful work lives in [SproutRepository].
+ */
+object Repository {
+    fun money(cents: Long): String = SproutRepository.money(cents)
+}
+
 class SproutRepository(private val db: SproutDb) {
     fun children(): Flow<List<ChildEntity>> = db.children().observe()
     suspend fun child(id: Long) = db.children().byId(id)
