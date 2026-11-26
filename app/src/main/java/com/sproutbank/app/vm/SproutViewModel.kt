@@ -132,6 +132,21 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
                 rewardCents = cents, rewardPoints = points))
         }
 
+    fun addBonus(childId: Long, cents: Long, points: Long, note: String) = viewModelScope.launch {
+        repo.recordCredit(childId, "BONUS", cents, note.ifBlank { "Bonus" }, points)
+    }
+
+    fun choreStateOfDate(state: ChildUiState, date: java.time.LocalDate): ChoreUiState {
+        if (date != java.time.LocalDate.now()) return ChoreUiState.AVAILABLE
+        return when {
+            state.completions.any { it.status == "PENDING" } -> ChoreUiState.PENDING
+            state.chores.isNotEmpty() && state.chores.all { c ->
+                state.completions.any { it.choreId == c.id && it.status == "APPROVED" }
+            } -> ChoreUiState.DONE
+            else -> ChoreUiState.AVAILABLE
+        }
+    }
+
     fun setChildGoal(child: ChildEntity, name: String, emoji: String, targetCents: Long, etf: String) =
         viewModelScope.launch {
             repo.saveChild(child.copy(goalName = name, goalEmoji = emoji,
