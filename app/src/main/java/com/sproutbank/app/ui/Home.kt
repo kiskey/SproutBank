@@ -12,12 +12,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.sproutbank.app.data.Repository
 import com.sproutbank.app.ui.components.*
-import com.sproutbank.app.vm.ChoreUiState
 import com.sproutbank.app.vm.ChildUiState
 import com.sproutbank.app.vm.SproutViewModel
 
@@ -50,7 +48,7 @@ fun HomeScreen(
             }
         }
 
-        item { HeroBankCard(state) }
+        item { HeroBankCard(state, reduced) }
 
         item { SavingsGoalCard(state, onOpenGoal) }
 
@@ -63,7 +61,7 @@ fun HomeScreen(
             item {
                 ThemedCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Sprout(mood = SproutMood.SLEEPING, size = 56.dp)
+                        Sprout(mood = SproutMood.SLEEPING, size = 56.dp, reduced = reduced)
                         Spacer(Modifier.width(12.dp))
                         Text("All chores done for today — nice work!",
                             style = MaterialTheme.typography.bodyLarge)
@@ -97,33 +95,56 @@ private fun greeting(): String {
 }
 
 @Composable
-private fun HeroBankCard(state: ChildUiState) {
+private fun HeroBankCard(state: ChildUiState, reduced: Boolean) {
     val scheme = MaterialTheme.colorScheme
-    Card(
-        shape = RoundedCornerShape(28.dp),
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = scheme.primaryContainer),
-    ) {
-        Column(Modifier.padding(24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Sprout(mood = SproutMood.GROWING, size = 72.dp)
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text("MY MONEY", style = MaterialTheme.typography.labelMedium,
-                        color = scheme.onPrimaryContainer)
-                    Text(Repository.money(state.balanceCents),
-                        style = MaterialTheme.typography.displayMedium,
-                        color = scheme.onPrimaryContainer)
+    Box(Modifier.fillMaxWidth()) {
+        // Layered shadow under hero card
+        Box(
+            Modifier
+                .matchParentSize()
+                .offset(y = 10.dp)
+                .background(scheme.primary.copy(alpha = 0.18f), RoundedCornerShape(28.dp)),
+        )
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = scheme.primaryContainer),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        ) {
+            Box {
+                // 3D coin & star accent
+                StorybookObject(
+                    StorybookObject.COIN,
+                    size = 72.dp,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp),
+                )
+                StorybookObject(
+                    StorybookObject.STAR,
+                    size = 40.dp,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 24.dp, bottom = 16.dp),
+                )
+                Column(Modifier.padding(24.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Sprout(mood = SproutMood.GROWING, size = 72.dp, reduced = reduced)
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text("MY MONEY", style = MaterialTheme.typography.labelMedium,
+                                color = scheme.onPrimaryContainer)
+                            Text(Repository.money(state.balanceCents),
+                                style = MaterialTheme.typography.displayMedium,
+                                color = scheme.onPrimaryContainer)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${state.points} ⭐", style = MaterialTheme.typography.titleMedium,
+                            color = scheme.onPrimaryContainer)
+                        Spacer(Modifier.weight(1f))
+                        Text("Look how much you've earned!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onPrimaryContainer)
+                    }
                 }
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${state.points} ⭐", style = MaterialTheme.typography.titleMedium,
-                    color = scheme.onPrimaryContainer)
-                Spacer(Modifier.weight(1f))
-                Text("Look how much you've earned!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onPrimaryContainer)
             }
         }
     }
@@ -162,9 +183,7 @@ private fun SavingsGoalCard(state: ChildUiState, onOpenGoal: () -> Unit) {
 @Composable
 internal fun GoalBar(label: String, progress: Float, color: Color) {
     Column(Modifier.fillMaxWidth()) {
-        Row {
-            Text(label, style = MaterialTheme.typography.labelMedium)
-        }
+        Text(label, style = MaterialTheme.typography.labelMedium)
         Spacer(Modifier.height(4.dp))
         LinearProgressIndicator(
             progress = { progress },
