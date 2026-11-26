@@ -2,14 +2,14 @@ package com.sproutbank.app.data
 
 import android.content.Context
 import com.sproutbank.app.rust.DailyPrice
-import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -20,10 +20,12 @@ import java.time.ZoneOffset
 object MarketData {
     private val tracked = listOf("VOO", "SCHG", "VT", "VTI")
     private val cache = mutableMapOf<String, List<DailyPrice>>()
-    private val client = HttpClient(OkHttp) {
-        install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
-    }
     private lateinit var diskCacheDir: File
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private val client = HttpClient(OkHttp) {
+        install(ContentNegotiation) { json(json) }
+    }
 
     fun init(context: Context) {
         diskCacheDir = File(context.cacheDir, "market").also { it.mkdirs() }
@@ -35,7 +37,6 @@ object MarketData {
         cache[symbol]?.let { if (it.isNotEmpty()) return it }
         val disk = readDisk(symbol)
         if (disk.isNotEmpty()) { cache[symbol] = disk; return disk }
-        // Deterministic seed only if nothing else is available yet.
         return com.sproutbank.app.rust.seedOfflinePrices(
             symbol,
             LocalDate.now().minusDays(days.toLong()).toString(),
@@ -53,7 +54,7 @@ object MarketData {
             val r = resp.chart.result?.firstOrNull() ?: return@runCatching
             val ts = r.timestamp ?: return@runCatching
             val closes = r.indicators.quote.firstOrNull()?.close ?: return@runCatching
-            val rows = ts.mapIndexedNotNull { i, t ->
+            val rows: List<DailyPrice> = ts.mapIndexedNotNull { i, t ->
                 val c = closes.getOrNull(i) ?: return@mapIndexedNotNull null
                 DailyPrice(
                     symbol = symbol,
@@ -68,18 +69,40 @@ object MarketData {
         }
     }
 
+    // ── Disk cache ────────────────────────────────────────────────────
+    // DailyPrice is UniFFI-generated and not @Serializable, so persist
+    // via a small @Serializable DTO instead.
+    @Serializable
+    private data class CachedPrice(
+        val symbol: String,
+        val date: String,
+        val closeCents: Long,
+    )
+
+    private fun DailyPrice.toCache() = CachedPrice(symbol, date, closeCents)
+    private fun CachedPrice.toPrice() = DailyPrice(
+        symbol = symbol,
+        date = date,
+        closeCents = closeCents,
+    )
+
     private fun cacheFile(symbol: String) = File(diskCacheDir, "$symbol.json")
+
     private fun readDisk(symbol: String): List<DailyPrice> = runCatching {
         val f = cacheFile(symbol)
         if (!f.exists()) return emptyList()
-        Json.decodeFromString<List<DailyPrice>>(f.readText())
+        val cached: List<CachedPrice> = json.decodeFromString(f.readText())
+        cached.map { it.toPrice() }
     }.getOrDefault(emptyList())
 
     private fun writeDisk(symbol: String, rows: List<DailyPrice>) {
-        runCatching { cacheFile(symbol).writeText(Json.encodeToString(rows)) }
+        runCatching {
+            val cached: List<CachedPrice> = rows.map { it.toCache() }
+            cacheFile(symbol).writeText(json.encodeToString(cached))
+        }
     }
 
-    // ---- Yahoo response shapes -----------------------------------------
+    // ── Yahoo response shapes ─────────────────────────────────────────
     @Serializable private data class ChartResponse(val chart: Chart)
     @Serializable private data class Chart(val result: List<Result>? = null)
     @Serializable private data class Result(
