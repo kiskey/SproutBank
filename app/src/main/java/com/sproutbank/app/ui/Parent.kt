@@ -3,7 +3,6 @@ package com.sproutbank.app.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +17,6 @@ import com.sproutbank.app.theme.CalmTheme
 import com.sproutbank.app.ui.components.GoalDialog
 import com.sproutbank.app.ui.components.ThemedCard
 import com.sproutbank.app.vm.SproutViewModel
-import kotlinx.coroutines.launch
 
 @Composable
 fun ParentGate(vm: SproutViewModel, onBack: () -> Unit) {
@@ -70,10 +68,12 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
     val chores by vm.allChores.collectAsState()
     val themeId by vm.themeId.collectAsState()
     val reduced by vm.reducedAnimations.collectAsState()
+    val state by vm.uiState.collectAsState()
 
     var declineTarget by remember { mutableStateOf<SpendRequestEntity?>(null) }
     var rejectChoreTarget by remember { mutableStateOf<ChoreCompletionEntity?>(null) }
     var goalTarget by remember { mutableStateOf<ChildEntity?>(null) }
+    var reverseTarget by remember { mutableStateOf<LedgerEntity?>(null) }
     var showAddChore by remember { mutableStateOf(false) }
     var showBonus by remember { mutableStateOf(false) }
     var showPinSetup by remember { mutableStateOf(false) }
@@ -90,7 +90,7 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             TabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
-                listOf("Approvals", "Family", "Settings").forEachIndexed { i, l ->
+                listOf("Approvals", "Family", "Ledger", "Settings").forEachIndexed { i, l ->
                     Tab(selected = tab == i, onClick = { tab = i }, text = { Text(l) })
                 }
             }
@@ -119,7 +119,7 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(onClick = { vm.decideChore(c, true, null) }) { Text("Approve") }
+                                    Button(onClick = { vm.approveChore(c) }) { Text("Approve") }
                                     OutlinedButton(onClick = { rejectChoreTarget = c }) { Text("Reject") }
                                 }
                             }
@@ -129,9 +129,10 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
                     items(requests.filter { it.status == "PENDING" }) { r ->
                         ThemedCard(Modifier.fillMaxWidth()) {
                             Text(r.title, style = MaterialTheme.typography.titleSmall)
-                            Text(Repository.money(r.amountCents), style = MaterialTheme.typography.bodySmall)
+                            Text(Repository.requestAmountDisplay(r),
+                                style = MaterialTheme.typography.bodySmall)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { vm.decideRequest(r, true, null) }) { Text("Approve") }
+                                Button(onClick = { vm.approveRequest(r) }) { Text("Approve") }
                                 OutlinedButton(onClick = { declineTarget = r }) { Text("Decline") }
                             }
                         }
@@ -152,10 +153,54 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(child.emoji, style = MaterialTheme.typography.headlineMedium)
                                 Spacer(Modifier.width(8.dp))
-                                Text(child.name, style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.weight(1f))
+                                Column(Modifier.weight(1f)) {
+                                    Text(child.name, style = MaterialTheme.typography.titleMedium)
+                                    if (state.active?.id == child.id) {
+                                        Text(
+                                            "Cash ${Repository.money(state.balanceCents)} · ${state.points} ⭐",
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                }
                                 OutlinedButton(onClick = { goalTarget = child }) {
                                     Text(if (child.goalName == null) "Set Goal" else "Edit Goal")
+                                }
+                            }
+                        }
+                    }
+                }
+                2 -> LazyColumn(
+                    Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item { Text("Ledger (append-only)", style = MaterialTheme.typography.titleLarge) }
+                    item {
+                        Text("Every correction is a reversal that references the original. Nothing is edited or deleted.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    items(state.ledger.reversed()) { e ->
+                        ThemedCard(Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("${e.kind} · ${e.account}",
+                                        style = MaterialTheme.typography.titleSmall)
+                                    Text(e.note.ifBlank { "—" },
+                                        style = MaterialTheme.typography.bodySmall)
+                                    Text("tx ${e.transactionId.take(8)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (e.reversesId != null) {
+                                        Text("↩ reverses #${e.reversesId}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.tertiary)
+                                    }
+                                }
+                                Text(Repository.ledgerAmountDisplay(e),
+                                    style = MaterialTheme.typography.titleSmall)
+                                if (e.kind != "REVERSAL") {
+                                    Spacer(Modifier.width(8.dp))
+                                    OutlinedButton(onClick = { reverseTarget = e }) { Text("Reverse") }
                                 }
                             }
                         }
@@ -193,14 +238,14 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
         DeclineReasonDialog(
             title = "Why is this declined?",
             onDismiss = { declineTarget = null },
-            onConfirm = { note -> vm.decideRequest(r, false, note); declineTarget = null },
+            onConfirm = { note -> vm.declineRequest(r, note); declineTarget = null },
         )
     }
     rejectChoreTarget?.let { c ->
         DeclineReasonDialog(
             title = "Why is this rejected?",
             onDismiss = { rejectChoreTarget = null },
-            onConfirm = { note -> vm.decideChore(c, false, note); rejectChoreTarget = null },
+            onConfirm = { note -> vm.rejectChore(c, note); rejectChoreTarget = null },
         )
     }
     goalTarget?.let { c ->
@@ -208,6 +253,13 @@ fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
             child = c,
             onDismiss = { goalTarget = null },
             onConfirm = { n, e, t, etf -> vm.setChildGoal(c, n, e, t, etf); goalTarget = null },
+        )
+    }
+    reverseTarget?.let { e ->
+        DeclineReasonDialog(
+            title = "Reverse this transaction?",
+            onDismiss = { reverseTarget = null },
+            onConfirm = { reason -> vm.reverseTransaction(e.id, reason); reverseTarget = null },
         )
     }
     if (showAddChore) {
@@ -248,7 +300,7 @@ private fun DeclineReasonDialog(title: String, onDismiss: () -> Unit, onConfirm:
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 presets.forEach { p -> AssistChip(onClick = { note = p }, label = { Text(p) }) }
-                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Custom message") })
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Custom message / reason") })
             }
         },
         confirmButton = { TextButton(onClick = { onConfirm(note.ifBlank { presets[0] }) }) { Text("Confirm") } },
