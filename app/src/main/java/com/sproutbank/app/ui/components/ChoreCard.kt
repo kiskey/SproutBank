@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.sproutbank.app.data.ChoreEntity
 import com.sproutbank.app.data.Repository
@@ -81,21 +82,23 @@ fun ChoreCard(
     }
 }
 
+private data class BadgeColors(val bg: Color, val fg: Color)
+
 @Composable
 private fun StatusBadge(state: ChoreUiState) {
-    val (label, color) = when (state) {
-        ChoreUiState.AVAILABLE -> "Ready" to MaterialTheme.colorScheme.primaryContainer
-        ChoreUiState.PENDING -> "Pending" to MaterialTheme.colorScheme.secondary
-        ChoreUiState.DONE -> "Done ✓" to MaterialTheme.colorScheme.primary
-        ChoreUiState.REJECTED -> "Try Again" to MaterialTheme.colorScheme.surfaceVariant
+    val scheme = MaterialTheme.colorScheme
+    val (label, colors) = when (state) {
+        ChoreUiState.AVAILABLE  -> "Ready"     to BadgeColors(scheme.primaryContainer,   scheme.onPrimaryContainer)
+        ChoreUiState.PENDING    -> "Pending"   to BadgeColors(scheme.secondaryContainer, scheme.onSecondaryContainer)
+        ChoreUiState.DONE       -> "Done ✓"    to BadgeColors(scheme.primary,            scheme.onPrimary)
+        ChoreUiState.REJECTED   -> "Try Again" to BadgeColors(scheme.surfaceVariant,     scheme.onSurfaceVariant)
     }
     Box(
         Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(color)
+            .background(colors.bg)
             .padding(horizontal = 10.dp, vertical = 6.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = colors.fg)
     }
 }
