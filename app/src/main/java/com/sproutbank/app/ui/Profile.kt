@@ -1,6 +1,5 @@
 package com.sproutbank.app.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,13 +8,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.sproutbank.app.theme.CalmTheme
 import com.sproutbank.app.ui.components.*
 import com.sproutbank.app.vm.ChildUiState
 import com.sproutbank.app.vm.SproutViewModel
-import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(
@@ -62,7 +59,9 @@ fun ProfileScreen(
             val t = CalmTheme.values()[i]
             Card(
                 shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth().clickable { vm.selectTheme(t.id) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tactileClickable(reduced = reduced) { vm.selectTheme(t.id) },
                 colors = CardDefaults.cardColors(
                     containerColor = if (themeId == t.id) MaterialTheme.colorScheme.primaryContainer
                     else MaterialTheme.colorScheme.surface,
@@ -119,9 +118,6 @@ fun ProfileScreen(
                     Spacer(Modifier.height(12.dp))
                     AvatarPickerGrid(pickedEmoji) { a ->
                         pickedEmoji = a.emoji
-                        pickedBg = "#%06X".format(0xFFFFFF and a.bgColor.value.toLong().let { (it shr 32).toInt() })
-                        pickedRing = "#%06X".format(0xFFFFFF and a.ringColor.value.toLong().let { (it shr 32).toInt() })
-                        // Simpler: store using hex from the Color itself
                         pickedBg = colorToHex(a.bgColor)
                         pickedRing = colorToHex(a.ringColor)
                     }
