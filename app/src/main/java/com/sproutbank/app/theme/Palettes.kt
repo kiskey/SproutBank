@@ -78,3 +78,55 @@ fun CalmTheme.scheme(dark: Boolean): ColorScheme = when (this) {
         surfaceVariant = Color(0xFFDFEDFC), onSurfaceVariant = Color(0xFF4C6480),
     )
 }
+
+/**
+ * Environmental pastel colours for the storybook background layer
+ * (sky, hills, clouds, grass). Light = pastel daylight; Dark = bioluminescent slate.
+ */
+data class StorybookPalette(
+    val skyTop: Color,
+    val skyBottom: Color,
+    val hillBack: Color,
+    val hillFront: Color,
+    val cloud: Color,
+    val grass: Color,
+)
+
+fun CalmTheme.storybook(dark: Boolean): StorybookPalette = when (this) {
+    CalmTheme.MEADOW_MINT -> if (dark) StorybookPalette(
+        skyTop = Color(0xFF0F1E22), skyBottom = Color(0xFF1B2F33),
+        hillBack = Color(0xFF1F3B3D), hillFront = Color(0xFF12302A),
+        cloud = Color(0xFF2F5257), grass = Color(0xFF3B7A6E),
+    ) else StorybookPalette(
+        skyTop = Color(0xFFDDF5EC), skyBottom = Color(0xFFF4FAF8),
+        hillBack = Color(0xFFBFE8D9), hillFront = Color(0xFF9CD3BE),
+        cloud = Color(0xFFFFFFFF), grass = Color(0xFF7FC3A8),
+    )
+    CalmTheme.SUNNY_OAT -> if (dark) StorybookPalette(
+        skyTop = Color(0xFF2A201A), skyBottom = Color(0xFF33261F),
+        hillBack = Color(0xFF4A3125), hillFront = Color(0xFF3A231A),
+        cloud = Color(0xFF6B4A3A), grass = Color(0xFF8F6A4F),
+    ) else StorybookPalette(
+        skyTop = Color(0xFFFBE4D7), skyBottom = Color(0xFFFDF7F0),
+        hillBack = Color(0xFFF8D4BC), hillFront = Color(0xFFEDB795),
+        cloud = Color(0xFFFFFFFF), grass = Color(0xFFE0A87F),
+    )
+    CalmTheme.LAVENDER_SEAFOAM -> if (dark) StorybookPalette(
+        skyTop = Color(0xFF18132B), skyBottom = Color(0xFF211B38),
+        hillBack = Color(0xFF2E2948), hillFront = Color(0xFF221E3C),
+        cloud = Color(0xFF4A4374), grass = Color(0xFF6B5BD0),
+    ) else StorybookPalette(
+        skyTop = Color(0xFFEAE4FC), skyBottom = Color(0xFFF6F3FE),
+        hillBack = Color(0xFFD3C8F5), hillFront = Color(0xFFB6A9E8),
+        cloud = Color(0xFFFFFFFF), grass = Color(0xFF9C8FE0),
+    )
+    CalmTheme.OCEAN_PEBBLE -> if (dark) StorybookPalette(
+        skyTop = Color(0xFF0F1A26), skyBottom = Color(0xFF1A2A3C),
+        hillBack = Color(0xFF24384E), hillFront = Color(0xFF172A3E),
+        cloud = Color(0xFF3A5977), grass = Color(0xFF4C6480),
+    ) else StorybookPalette(
+        skyTop = Color(0xFFDFEDFC), skyBottom = Color(0xFFF3F7FC),
+        hillBack = Color(0xFFC3DCF5), hillFront = Color(0xFF9FBFE5),
+        cloud = Color(0xFFFFFFFF), grass = Color(0xFF7FA1BE),
+    )
+}
