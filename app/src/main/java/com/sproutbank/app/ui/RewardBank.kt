@@ -1,7 +1,6 @@
 package com.sproutbank.app.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,7 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.sproutbank.app.data.Repository
@@ -23,13 +22,22 @@ import com.sproutbank.app.vm.SproutViewModel
 @Composable
 fun RewardBankScreen(vm: SproutViewModel, state: ChildUiState) {
     var showRequest by remember { mutableStateOf(false) }
+    val reduced by vm.reducedAnimations.collectAsState()
 
-    Scaffold(topBar = { TopAppBar(title = { Text("My Reward Bank") }) }) { pad ->
+    Scaffold(
+        containerColor = Color.Transparent,
+        topBar = {
+            TopAppBar(
+                title = { Text("My Reward Bank") },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            )
+        },
+    ) { pad ->
         LazyColumn(
             Modifier.padding(pad).fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { BankHero(state) }
+            item { BankHero(state, reduced) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = { showRequest = true }, modifier = Modifier.weight(1f)) {
@@ -50,13 +58,13 @@ fun RewardBankScreen(vm: SproutViewModel, state: ChildUiState) {
             items(state.ledger.reversed()) { e ->
                 ThemedCard(Modifier.fillMaxWidth()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
+                        StorybookObject(
                             when (e.kind) {
-                                "CREDIT", "BONUS" -> "🟢"
-                                "POINTS" -> "⭐"
-                                else -> "🛍️"
+                                "CREDIT", "BONUS" -> StorybookObject.COIN
+                                "POINTS" -> StorybookObject.STAR
+                                else -> StorybookObject.SHOPPING_BAG
                             },
-                            style = MaterialTheme.typography.titleMedium,
+                            size = 40.dp,
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
@@ -92,18 +100,25 @@ fun RewardBankScreen(vm: SproutViewModel, state: ChildUiState) {
 }
 
 @Composable
-private fun BankHero(state: ChildUiState) {
+private fun BankHero(state: ChildUiState, reduced: Boolean) {
     val scheme = MaterialTheme.colorScheme
-    Card(
-        shape = RoundedCornerShape(28.dp),
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = scheme.primaryContainer),
-    ) {
-        Column(Modifier.padding(24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Sprout(mood = SproutMood.GROWING, size = 72.dp)
-                Spacer(Modifier.width(16.dp))
-                Column {
+    Box(Modifier.fillMaxWidth()) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .offset(y = 10.dp)
+                .background(scheme.primary.copy(alpha = 0.18f), RoundedCornerShape(28.dp)),
+        )
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = scheme.primaryContainer),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        ) {
+            Box {
+                StorybookObject(StorybookObject.PIGGY, size = 84.dp,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp))
+                Column(Modifier.padding(24.dp)) {
                     Text("MY MONEY", style = MaterialTheme.typography.labelMedium,
                         color = scheme.onPrimaryContainer)
                     Text(Repository.money(state.balanceCents),
@@ -112,12 +127,15 @@ private fun BankHero(state: ChildUiState) {
                     Text("Available to spend or save.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onPrimaryContainer)
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StorybookObject(StorybookObject.STAR, size = 28.dp)
+                        Spacer(Modifier.width(6.dp))
+                        Text("${state.points} points", style = MaterialTheme.typography.titleMedium,
+                            color = scheme.onPrimaryContainer)
+                    }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Text("${state.points} ⭐ points",
-                style = MaterialTheme.typography.titleMedium,
-                color = scheme.onPrimaryContainer)
         }
     }
 }
