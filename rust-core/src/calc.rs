@@ -61,7 +61,10 @@ fn apply_events(
 
     for p in &sorted {
         while t_idx < trades.len() && trades[t_idx].0 == p.date {
-            let (_d, delta, ev) = trades[t_idx];
+            // Borrow the tuple instead of moving out of the Vec.
+            let (_d, delta, ev) = &trades[t_idx];
+            let delta = *delta;
+            let ev = *ev;
             if let Some(e) = ev {
                 if e.kind.is_credit() {
                     shares_micro += delta;
