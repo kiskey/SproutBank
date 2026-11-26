@@ -1,5 +1,5 @@
 use crate::model::*;
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Utc};
 
 pub fn buy_shares_micro(amount_cents: i64, price_cents: i64) -> i64 {
     if price_cents <= 0 { return 0; }
@@ -12,10 +12,12 @@ fn ms_to_iso(ms: i64) -> String {
         .unwrap_or_else(|| "1970-01-01".into())
 }
 
-/// Price to use for a trade that occurred on `date`. Picks the first price
-/// on or after the event date, falling back to the last available price.
-fn trade_price(prices: &[&DailyPrice], date: &str) -> Option<&DailyPrice> {
-    prices.iter().find(|p| p.date.as_str() >= date).copied()
+// The returned reference is bound to the element lifetime of `prices`,
+// not to the slice borrow nor to `date` (which is only used for comparison).
+fn trade_price<'a>(prices: &[&'a DailyPrice], date: &str) -> Option<&'a DailyPrice> {
+    prices.iter()
+        .find(|p| p.date.as_str() >= date)
+        .copied()
         .or_else(|| prices.last().copied())
 }
 
@@ -34,8 +36,6 @@ fn apply_events(
     let mut evs: Vec<&LedgerEvent> = events.iter().collect();
     evs.sort_by_key(|e| e.timestamp_ms);
 
-    // Pre-compute share deltas per date-string keyed by trade date.
-    // Each trade's date = the price date used.
     let mut trades: Vec<(String, i64, Option<&LedgerEvent>)> = Vec::new();
     for e in &evs {
         if e.kind.is_credit() {
@@ -47,7 +47,6 @@ fn apply_events(
         } else if with_spends && e.kind.is_spend() {
             let d = ms_to_iso(e.timestamp_ms);
             if let Some(p) = trade_price(&sorted, &d) {
-                // We don't yet know held shares here; record spend to settle later.
                 trades.push((p.date.clone(), -1, Some(e)));
             }
         }
@@ -68,7 +67,6 @@ fn apply_events(
                     shares_micro += delta;
                     credited_cents += e.amount_cents;
                 } else if e.kind.is_spend() {
-                    // Proportional / value-based sale.
                     let desired_value = e.amount_cents;
                     let mut sell_micro = buy_shares_micro(desired_value, p.close_cents);
                     if sell_micro > shares_micro { sell_micro = shares_micro; }
@@ -95,12 +93,10 @@ fn apply_events(
     (out, sold)
 }
 
-/// Value series where only credits are applied (no spends deducted).
 pub fn build_portfolio_series(prices: Vec<DailyPrice>, events: Vec<LedgerEvent>) -> Vec<PortfolioPoint> {
     apply_events(&prices, &events, false).0
 }
 
-/// Value series where credits AND spends (as proportional share sales) are applied.
 pub fn compute_spend_impact(prices: Vec<DailyPrice>, events: Vec<LedgerEvent>) -> SpendImpactResult {
     let unspent = apply_events(&prices, &events, false).0;
     let (after_spend, sold) = apply_events(&prices, &events, true);
