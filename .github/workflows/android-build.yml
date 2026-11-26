@@ -1,10 +1,6 @@
 name: Android Build
 
 on:
-#  push:
-#    branches: [ main ]
-#    tags: [ 'v*' ]
-#  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -34,6 +30,11 @@ jobs:
           sdkmanager --install "ndk;26.1.10909125" "platform-tools"
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -60,16 +61,13 @@ jobs:
             --library target/aarch64-linux-android/release/libsproutbank_core.so \
             --out-dir ../app/build/generated/source/uniffi/main/java
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Run unit tests (Rust + JVM)
         run: |
           (cd rust-core && cargo test)
-          ./gradlew :app:testDebugUnitTest
+          gradle :app:testDebugUnitTest --no-daemon
 
       - name: Upload debug APK as workflow artifact
         uses: actions/upload-artifact@v4
