@@ -1,6 +1,7 @@
 name: Android Build
 
 on:
+
   workflow_dispatch:
 
 permissions:
@@ -59,7 +60,10 @@ jobs:
           cargo run --features=uniffi/cli --bin uniffi-bindgen -- generate \
             --language kotlin \
             --library target/aarch64-linux-android/release/libsproutbank_core.so \
+            --config uniffi.toml \
             --out-dir ../app/build/generated/source/uniffi/main/java
+          echo "---- Generated binding tree ----"
+          find ../app/build/generated/source/uniffi/main/java -type f -name "*.kt" -print
 
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace --no-daemon
