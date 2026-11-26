@@ -25,7 +25,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # --- FIXED: @v4 no longer tries to install the removed "tools" package ---
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
@@ -40,10 +39,8 @@ jobs:
         with:
           targets: aarch64-linux-android, x86_64-linux-android
 
-      - name: Install cargo-ndk and uniffi-bindgen
-        run: |
-          cargo install cargo-ndk --version 4.1.2 --locked
-          cargo install uniffi_bindgen --version 0.28.3 --locked
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --version 4.1.2 --locked
 
       - name: Build Rust core (release)
         working-directory: rust-core
@@ -58,7 +55,7 @@ jobs:
         working-directory: rust-core
         run: |
           mkdir -p ../app/build/generated/source/uniffi/main/java
-          uniffi-bindgen generate \
+          cargo run --features=uniffi/cli --bin uniffi-bindgen -- generate \
             --language kotlin \
             --library target/aarch64-linux-android/release/libsproutbank_core.so \
             --out-dir ../app/build/generated/source/uniffi/main/java
