@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sproutbank.app.ui.components.ChoreCard
@@ -102,6 +103,8 @@ fun ChoresScreen(vm: SproutViewModel, state: ChildUiState) {
     }
 }
 
+private data class DayColors(val bg: Color, val fg: Color)
+
 @Composable
 private fun DayChip(
     date: LocalDate,
@@ -110,13 +113,12 @@ private fun DayChip(
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val bg = when {
-        selected -> scheme.primary
-        status == ChoreUiState.DONE -> scheme.primaryContainer
-        status == ChoreUiState.PENDING -> scheme.secondary.copy(alpha = 0.5f)
-        else -> scheme.surfaceVariant
+    val (bg, fg) = when {
+        selected -> scheme.primary to scheme.onPrimary
+        status == ChoreUiState.DONE -> scheme.primaryContainer to scheme.onPrimaryContainer
+        status == ChoreUiState.PENDING -> scheme.secondaryContainer to scheme.onSecondaryContainer
+        else -> scheme.surfaceVariant to scheme.onSurfaceVariant
     }
-    val fg = if (selected) scheme.onPrimary else scheme.onSurfaceVariant
     Column(
         Modifier
             .width(56.dp)
