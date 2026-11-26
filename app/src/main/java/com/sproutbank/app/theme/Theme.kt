@@ -12,7 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import com.sproutbank.app.vm.SproutViewModel
 
-/** The current environmental storybook palette derived from theme + system dark mode. */
 val LocalStorybookPalette = compositionLocalOf<StorybookPalette> {
     CalmTheme.MEADOW_MINT.storybook(false)
 }
@@ -25,10 +24,14 @@ fun SproutTheme(vm: SproutViewModel, content: @Composable () -> Unit) {
     val target = CalmTheme.fromId(themeId).scheme(dark)
     val duration = if (reduced) 0 else 360
 
+    // animateColorAsState is @Composable, so this helper must be too.
+    @Composable
     fun anim(c: Color): Color {
-        @Suppress("NAME_SHADOWING") val s by animateColorAsState(c, tween(duration), label = "palette")
+        @Suppress("NAME_SHADOWING")
+        val s by animateColorAsState(c, tween(duration), label = "palette")
         return s
     }
+
     val scheme = target.copy(
         primary = anim(target.primary),
         background = anim(target.background),
