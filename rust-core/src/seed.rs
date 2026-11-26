@@ -1,5 +1,5 @@
 use crate::model::DailyPrice;
-use chrono::{Duration, NaiveDate};
+use chrono::{Datelike, Duration, NaiveDate};
 
 fn lcg(seed: &mut u64) -> f64 {
     *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
@@ -26,7 +26,6 @@ fn drift_bp_per_day(symbol: &str) -> f64 {
     }
 }
 
-/// Deterministic pseudo-random-walk price history, ending on `end_date`.
 pub fn seed_offline_prices(
     symbol: String,
     start_date: String,
@@ -36,6 +35,8 @@ pub fn seed_offline_prices(
         .unwrap_or_else(|_| NaiveDate::from_ymd_opt(2023, 1, 1).unwrap());
     let end = NaiveDate::parse_from_str(&end_date, "%Y-%m-%d")
         .unwrap_or_else(|_| chrono::Local::now().date_naive());
+
+    // Datelike::num_days_from_ce via the trait; deterministic per (symbol, start_date).
     let mut rng_seed: u64 = (symbol.bytes().map(|b| b as u64).sum::<u64>())
         .wrapping_mul(31)
         .wrapping_add(start.num_days_from_ce() as u64);
@@ -46,7 +47,6 @@ pub fn seed_offline_prices(
     let mut out = Vec::new();
     let mut day = start;
     while day <= end {
-        // skip weekends
         let wd = day.format("%u").to_string().parse::<u32>().unwrap_or(1);
         if wd <= 5 {
             let noise = (lcg(&mut rng_seed) - 0.5) * 0.012;
