@@ -2,11 +2,11 @@ package com.sproutbank.app.ui
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,19 +21,26 @@ import com.sproutbank.app.ui.components.*
 fun GoalScreen(state: com.sproutbank.app.vm.ChildUiState, onBack: () -> Unit) {
     val active = state.active ?: return
     val goal = state.goal ?: return
-    Scaffold(topBar = {
-        TopAppBar(
-            title = { Text("My Savings Goal") },
-            navigationIcon = { TextButton(onClick = onBack) { Text("← Back") } },
-        )
-    }) { pad ->
+    val reduced = false
+    Scaffold(
+        containerColor = Color.Transparent,
+        topBar = {
+            TopAppBar(
+                title = { Text("My Savings Goal") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("← Back") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            )
+        },
+    ) { pad ->
         Column(
             Modifier.padding(pad).fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Card(shape = RoundedCornerShape(28.dp),
+            Card(
+                shape = RoundedCornerShape(28.dp),
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            ) {
                 Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(active.goalEmoji, style = MaterialTheme.typography.displayLarge)
                     Text("My ${active.goalName ?: "Dream"}",
@@ -73,7 +80,7 @@ fun GoalScreen(state: com.sproutbank.app.vm.ChildUiState, onBack: () -> Unit) {
             }
             if (goal.marketBoostCents > 0) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Sprout(mood = SproutMood.CELEBRATING, size = 72.dp)
+                    Sprout(mood = SproutMood.CELEBRATING, size = 72.dp, reduced = reduced)
                     Spacer(Modifier.width(16.dp))
                     Text("Market boost so far: +${Repository.money(goal.marketBoostCents)}",
                         style = MaterialTheme.typography.titleMedium,
