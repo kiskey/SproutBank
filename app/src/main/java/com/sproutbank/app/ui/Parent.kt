@@ -4,81 +4,173 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.sproutbank.app.data.Repository
-import com.sproutbank.app.data.SpendRequestEntity
+import com.sproutbank.app.data.*
 import com.sproutbank.app.theme.CalmTheme
-import com.sproutbank.app.ui.components.DeclineDialog
 import com.sproutbank.app.ui.components.GoalDialog
+import com.sproutbank.app.ui.components.ThemedCard
 import com.sproutbank.app.vm.SproutViewModel
+import kotlinx.coroutines.launch
+
+/** Wraps ParentScreen with a PIN gate. */
+@Composable
+fun ParentGate(vm: SproutViewModel, onBack: () -> Unit) {
+    var unlocked by remember { mutableStateOf(false) }
+    var enteredPin by remember { mutableStateOf("") }
+    var storedPin by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        storedPin = vm.getParentPin()
+        if (storedPin.isNullOrEmpty()) unlocked = true
+    }
+    if (storedPin == null) return
+
+    if (!unlocked) {
+        AlertDialog(
+            onDismissRequest = onBack,
+            title = { Text("Parent Access") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Enter your 4-digit PIN")
+                    OutlinedTextField(
+                        value = enteredPin, onValueChange = { if (it.length <= 4 && it.all(Char::isDigit)) enteredPin = it },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        singleLine = true,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (enteredPin == storedPin) unlocked = true else enteredPin = ""
+                }) { Text("Unlock") }
+            },
+            dismissButton = { TextButton(onClick = onBack) { Text("Cancel") } },
+        )
+        return
+    }
+
+    ParentScreen(vm, onBack)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ParentScreen(vm: SproutViewModel) {
+fun ParentScreen(vm: SproutViewModel, onBack: () -> Unit) {
+    var tab by remember { mutableStateOf(0) }
     val children by vm.children.collectAsState()
     val requests by vm.allRequests.collectAsState()
-    var declineTarget by remember { mutableStateOf<SpendRequestEntity?>(null) }
-    var goalTarget by remember { mutableStateOf<com.sproutbank.app.data.ChildEntity?>(null) }
+    val completions by vm.allCompletions.collectAsState()
+    val chores by vm.allChores.collectAsState()
+    val themeId by vm.themeId.collectAsState()
+    val reduced by vm.reducedAnimations.collectAsState()
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Parent Hub") }) }) { pad ->
-        LazyColumn(
-            Modifier.padding(pad).fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item { Text("Spend & Redemption Requests",
-                style = MaterialTheme.typography.titleMedium) }
-            if (requests.isEmpty()) {
-                item { Text("No requests yet.", style = MaterialTheme.typography.bodySmall) }
+    var declineTarget by remember { mutableStateOf<SpendRequestEntity?>(null) }
+    var rejectChoreTarget by remember { mutableStateOf<ChoreCompletionEntity?>(null) }
+    var goalTarget by remember { mutableStateOf<ChildEntity?>(null) }
+    var showAddChore by remember { mutableStateOf(false) }
+    var showBonus by remember { mutableStateOf(false) }
+    var showPinSetup by remember { mutableStateOf(false) }
+
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text("Parent Hub") },
+            navigationIcon = { TextButton(onClick = onBack) { Text("←") } },
+        )
+    }) { pad ->
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            TabRow(selectedTabIndex = tab) {
+                listOf("Approvals", "Family", "Settings").forEachIndexed { i, l ->
+                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(l) })
+                }
             }
-            items(requests) { r ->
-                Card(shape = RoundedCornerShape(16.dp)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(r.title, style = MaterialTheme.typography.titleSmall)
-                        Text("${Repository.money(r.amountCents)} · ${r.status}",
-                            style = MaterialTheme.typography.bodySmall)
-                        if (r.status == "PENDING") {
+            when (tab) {
+                0 -> LazyColumn(
+                    Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item { Text("Needs Your Attention", style = MaterialTheme.typography.titleLarge) }
+                    item { Text("${completions.count { it.status == "PENDING" } + requests.count { it.status == "PENDING" }} items waiting",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    item { Text("Chore Approvals", style = MaterialTheme.typography.titleMedium) }
+                    items(completions.filter { it.status == "PENDING" }) { c ->
+                        val chore = chores.firstOrNull { it.id == c.choreId }
+                        if (chore != null) {
+                            ThemedCard(Modifier.fillMaxWidth()) {
+                                Text("${chore.emoji} ${chore.title}", style = MaterialTheme.typography.titleSmall)
+                                Text(Repository.money(chore.rewardCents) + if (chore.rewardPoints > 0) " · ${chore.rewardPoints} ⭐" else "",
+                                    style = MaterialTheme.typography.bodySmall)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = { vm.decideChore(c, true, null) }) { Text("Approve") }
+                                    OutlinedButton(onClick = { rejectChoreTarget = c }) { Text("Reject") }
+                                }
+                            }
+                        }
+                    }
+                    item { Text("Spend Requests", style = MaterialTheme.typography.titleMedium) }
+                    items(requests.filter { it.status == "PENDING" }) { r ->
+                        ThemedCard(Modifier.fillMaxWidth()) {
+                            Text(r.title, style = MaterialTheme.typography.titleSmall)
+                            Text(Repository.money(r.amountCents), style = MaterialTheme.typography.bodySmall)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { vm.decideRequest(r, true, null) }) { Text("Confirm") }
+                                Button(onClick = { vm.decideRequest(r, true, null) }) { Text("Approve") }
                                 OutlinedButton(onClick = { declineTarget = r }) { Text("Decline") }
                             }
-                        } else if (r.status == "DECLINED" && r.decisionNote != null) {
-                            Text("Reason: ${r.decisionNote}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
-            }
-            item { Text("Children", style = MaterialTheme.typography.titleMedium) }
-            items(children) { child ->
-                Card(shape = RoundedCornerShape(16.dp)) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Text("${child.emoji} ${child.name}",
-                            Modifier.weight(1f),
-                            style = MaterialTheme.typography.titleSmall)
-                        OutlinedButton(onClick = { goalTarget = child }) {
-                            Text(if (child.goalName == null) "Set Goal" else "Edit Goal")
+                1 -> LazyColumn(
+                    Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { showAddChore = true }) { Text("+ Add Chore") }
+                            OutlinedButton(onClick = { showBonus = true }) { Text("Give Bonus") }
+                        }
+                    }
+                    items(children) { child ->
+                        ThemedCard(Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(child.emoji, style = MaterialTheme.typography.headlineMedium)
+                                Spacer(Modifier.width(8.dp))
+                                Text(child.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                                OutlinedButton(onClick = { goalTarget = child }) {
+                                    Text(if (child.goalName == null) "Set Goal" else "Edit Goal")
+                                }
+                            }
                         }
                     }
                 }
-            }
-            item { Text("Themes", style = MaterialTheme.typography.titleMedium) }
-            item {
-                val themeId by vm.themeId.collectAsState()
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    CalmTheme.values().forEach { t ->
-                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                else -> LazyColumn(
+                    Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item { Text("Themes", style = MaterialTheme.typography.titleMedium) }
+                    items(CalmTheme.values().size) { i ->
+                        val t = CalmTheme.values()[i]
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(selected = themeId == t.id, onClick = { vm.selectTheme(t.id) })
                             Text(t.label)
                         }
                     }
-                    val reduced by vm.reducedAnimations.collectAsState()
-                    Row {
-                        Text("Reduced animations", Modifier.weight(1f))
-                        Switch(checked = reduced, onCheckedChange = { vm.setReducedAnimations(it) })
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Reduced animations", Modifier.weight(1f))
+                            Switch(checked = reduced, onCheckedChange = { vm.setReducedAnimations(it) })
+                        }
+                    }
+                    item {
+                        OutlinedButton(onClick = { showPinSetup = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Set / Change Parent PIN")
+                        }
                     }
                 }
             }
@@ -86,10 +178,17 @@ fun ParentScreen(vm: SproutViewModel) {
     }
 
     declineTarget?.let { r ->
-        DeclineDialog(
-            request = r,
+        DeclineReasonDialog(
+            title = "Why is this declined?",
             onDismiss = { declineTarget = null },
-            onDecline = { note -> vm.decideRequest(r, false, note); declineTarget = null },
+            onConfirm = { note -> vm.decideRequest(r, false, note); declineTarget = null },
+        )
+    }
+    rejectChoreTarget?.let { c ->
+        DeclineReasonDialog(
+            title = "Why is this rejected?",
+            onDismiss = { rejectChoreTarget = null },
+            onConfirm = { note -> vm.decideChore(c, false, note); rejectChoreTarget = null },
         )
     }
     goalTarget?.let { c ->
@@ -99,4 +198,141 @@ fun ParentScreen(vm: SproutViewModel) {
             onConfirm = { n, e, t, etf -> vm.setChildGoal(c, n, e, t, etf); goalTarget = null },
         )
     }
+    if (showAddChore) {
+        AddChoreDialog(
+            children = children,
+            onDismiss = { showAddChore = false },
+            onConfirm = { childId, title, emoji, cents, points ->
+                vm.addChore(childId, title, emoji, cents, points)
+                showAddChore = false
+            },
+        )
+    }
+    if (showBonus) {
+        BonusDialog(
+            children = children,
+            onDismiss = { showBonus = false },
+            onConfirm = { childId, cents, points, note ->
+                vm.addBonus(childId, cents, points, note)
+                showBonus = false
+            },
+        )
+    }
+    if (showPinSetup) {
+        PinSetupDialog(
+            onDismiss = { showPinSetup = false },
+            onConfirm = { pin -> vm.setParentPin(pin); showPinSetup = false },
+        )
+    }
+}
+
+@Composable
+private fun DeclineReasonDialog(title: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var note by remember { mutableStateOf("") }
+    val presets = listOf("Let's save a little more first", "Wait until the weekend", "Needs a little more effort")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                presets.forEach { p -> AssistChip(onClick = { note = p }, label = { Text(p) }) }
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Custom message") })
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(note.ifBlank { presets[0] }) }) { Text("Confirm") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun AddChoreDialog(
+    children: List<ChildEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long, String, String, Long, Long) -> Unit,
+) {
+    var childId by remember { mutableStateOf(children.firstOrNull()?.id ?: 1L) }
+    var title by remember { mutableStateOf("") }
+    var emoji by remember { mutableStateOf("🛏️") }
+    var cents by remember { mutableStateOf("100") }
+    var points by remember { mutableStateOf("0") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Chore") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    children.forEach {
+                        FilterChip(selected = childId == it.id, onClick = { childId = it.id }, label = { Text(it.name) })
+                    }
+                }
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") })
+                OutlinedTextField(value = emoji, onValueChange = { if (it.length <= 2) emoji = it }, label = { Text("Emoji") })
+                OutlinedTextField(value = cents, onValueChange = { cents = it }, label = { Text("Money cents") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                OutlinedTextField(value = points, onValueChange = { points = it }, label = { Text("Points") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = title.isNotBlank(), onClick = {
+                onConfirm(childId, title, emoji, cents.toLongOrNull() ?: 0L, points.toLongOrNull() ?: 0L)
+            }) { Text("Add") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun BonusDialog(
+    children: List<ChildEntity>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long, Long, Long, String) -> Unit,
+) {
+    var childId by remember { mutableStateOf(children.firstOrNull()?.id ?: 1L) }
+    var cents by remember { mutableStateOf("") }
+    var points by remember { mutableStateOf("0") }
+    var note by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Give Bonus") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    children.forEach {
+                        FilterChip(selected = childId == it.id, onClick = { childId = it.id }, label = { Text(it.name) })
+                    }
+                }
+                OutlinedTextField(value = cents, onValueChange = { cents = it }, label = { Text("Money cents") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                OutlinedTextField(value = points, onValueChange = { points = it }, label = { Text("Points") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Note") })
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = (cents.toLongOrNull() ?: 0L) > 0 || (points.toLongOrNull() ?: 0L) > 0,
+                onClick = { onConfirm(childId, cents.toLongOrNull() ?: 0L, points.toLongOrNull() ?: 0L, note) }) {
+                Text("Give")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun PinSetupDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var pin by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Set Parent PIN") },
+        text = {
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { if (it.length <= 4 && it.all(Char::isDigit)) pin = it },
+                label = { Text("4 digits") },
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = pin.length == 4, onClick = { onConfirm(pin) }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
