@@ -7,7 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sproutbank.app.ui.components.ChoreCard
 import com.sproutbank.app.ui.components.ChoreDisplay
+import com.sproutbank.app.vm.ChoreUiState
 import com.sproutbank.app.vm.ChildUiState
 import com.sproutbank.app.vm.SproutViewModel
 import java.time.LocalDate
@@ -33,14 +35,18 @@ fun ChoresScreen(vm: SproutViewModel, state: ChildUiState) {
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { month = month.minusMonths(1) }) { Text("‹", style = MaterialTheme.typography.headlineSmall) }
+                TextButton(onClick = { month = month.minusMonths(1) }) {
+                    Text("‹", style = MaterialTheme.typography.headlineSmall)
+                }
                 Text(
                     month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                 )
-                IconButton(onClick = { month = month.plusMonths(1) }) { Text("›", style = MaterialTheme.typography.headlineSmall) }
+                TextButton(onClick = { month = month.plusMonths(1) }) {
+                    Text("›", style = MaterialTheme.typography.headlineSmall)
+                }
             }
         }
         item {
@@ -50,7 +56,7 @@ fun ChoresScreen(vm: SproutViewModel, state: ChildUiState) {
                     DayChip(
                         date = d,
                         selected = d == selectedDate,
-                        status = statusForDate(vm, state, d),
+                        status = vm.choreStateOfDate(state, d),
                         onClick = { selectedDate = d },
                     )
                 }
@@ -64,7 +70,12 @@ fun ChoresScreen(vm: SproutViewModel, state: ChildUiState) {
             )
         }
         if (state.chores.isEmpty()) {
-            item { Text("No chores yet — ask a parent to add some!", style = MaterialTheme.typography.bodyMedium) }
+            item {
+                Text(
+                    "No chores yet — ask a parent to add some!",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         } else {
             items(state.chores) { chore ->
                 ChoreCard(ChoreDisplay(chore, vm.choreState(chore))) {
@@ -79,8 +90,11 @@ fun ChoresScreen(vm: SproutViewModel, state: ChildUiState) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (0..6).forEach { offset ->
                     val d = LocalDate.now().minusDays((6 - offset).toLong())
-                    val done = vm.choreStateOfDate(state, d).let { it == com.sproutbank.app.vm.ChoreUiState.DONE }
-                    Text(if (done) "⭐" else "·", style = MaterialTheme.typography.headlineSmall)
+                    val done = vm.choreStateOfDate(state, d) == ChoreUiState.DONE
+                    Text(
+                        if (done) "⭐" else "·",
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
                 }
             }
         }
@@ -91,14 +105,14 @@ fun ChoresScreen(vm: SproutViewModel, state: ChildUiState) {
 private fun DayChip(
     date: LocalDate,
     selected: Boolean,
-    status: com.sproutbank.app.vm.ChoreUiState,
+    status: ChoreUiState,
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val bg = when {
         selected -> scheme.primary
-        status == com.sproutbank.app.vm.ChoreUiState.DONE -> scheme.primaryContainer
-        status == com.sproutbank.app.vm.ChoreUiState.PENDING -> scheme.secondary.copy(alpha = 0.5f)
+        status == ChoreUiState.DONE -> scheme.primaryContainer
+        status == ChoreUiState.PENDING -> scheme.secondary.copy(alpha = 0.5f)
         else -> scheme.surfaceVariant
     }
     val fg = if (selected) scheme.onPrimary else scheme.onSurfaceVariant
@@ -111,33 +125,24 @@ private fun DayChip(
             .padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(date.format(DateTimeFormatter.ofPattern("EEE")),
-            style = MaterialTheme.typography.labelSmall, color = fg)
-        Text(date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.titleMedium, color = fg)
+        Text(
+            date.format(DateTimeFormatter.ofPattern("EEE")),
+            style = MaterialTheme.typography.labelSmall,
+            color = fg,
+        )
+        Text(
+            date.dayOfMonth.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = fg,
+        )
         Text(
             when (status) {
-                com.sproutbank.app.vm.ChoreUiState.DONE -> "✓"
-                com.sproutbank.app.vm.ChoreUiState.PENDING -> "⏳"
+                ChoreUiState.DONE -> "✓"
+                ChoreUiState.PENDING -> "⏳"
                 else -> " "
             },
-            style = MaterialTheme.typography.labelMedium, color = fg,
+            style = MaterialTheme.typography.labelMedium,
+            color = fg,
         )
     }
-}
-
-private fun statusForDate(
-    vm: SproutViewModel,
-    state: ChildUiState,
-    date: LocalDate,
-): com.sproutbank.app.vm.ChoreUiState {
-    if (date == LocalDate.now()) {
-        return if (state.completions.any { it.status == "PENDING" })
-            com.sproutbank.app.vm.ChoreUiState.PENDING
-        else if (state.chores.isNotEmpty() &&
-            state.chores.all { c -> state.completions.any { it.choreId == c.id && it.status == "APPROVED" } })
-            com.sproutbank.app.vm.ChoreUiState.DONE
-        else com.sproutbank.app.vm.ChoreUiState.AVAILABLE
-    }
-    return com.sproutbank.app.vm.ChoreUiState.AVAILABLE
 }
