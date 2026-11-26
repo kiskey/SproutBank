@@ -3,6 +3,7 @@ package com.sproutbank.app.vm
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sproutbank.app.data.MarketData                 // ← add this import
 import com.sproutbank.app.data.*
 import com.sproutbank.app.rust.GoalProgress
 import com.sproutbank.app.rust.SpendImpactResult
@@ -50,6 +51,19 @@ class SproutViewModel(app: Application) : AndroidViewModel(app) {
 
     val allRequests = repo.allRequests().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val latestCelebration = repo.latestCelebration().stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    // ── ADD THIS BLOCK HERE ────────────────────────────────────────────
+    init {
+        viewModelScope.launch {
+            MarketData.trackedEtfs().forEach { runCatching { MarketData.refresh(it) } }
+        }
+    }
+
+    // Optional: expose a public refresh entry point for a "Sync" button
+    fun refreshMarkets() = viewModelScope.launch {
+        MarketData.trackedEtfs().forEach { runCatching { MarketData.refresh(it) } }
+    }
+    // ───────────────────────────────────────────────────────────────────
 
     fun selectTheme(id: String) = viewModelScope.launch {
         repo.saveSettings(SettingsEntity(themeId = id, reducedAnimations = reducedAnimations.value))
