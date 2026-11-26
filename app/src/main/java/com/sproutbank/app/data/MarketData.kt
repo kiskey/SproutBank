@@ -11,6 +11,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString        // ← the missing import
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.time.Instant
@@ -70,8 +71,6 @@ object MarketData {
     }
 
     // ── Disk cache ────────────────────────────────────────────────────
-    // DailyPrice is UniFFI-generated and not @Serializable, so persist
-    // via a small @Serializable DTO instead.
     @Serializable
     private data class CachedPrice(
         val symbol: String,
@@ -98,6 +97,8 @@ object MarketData {
     private fun writeDisk(symbol: String, rows: List<DailyPrice>) {
         runCatching {
             val cached: List<CachedPrice> = rows.map { it.toCache() }
+            // The extension function kotlinx.serialization.encodeToString is now in scope,
+            // so this resolves to encodeToString(value: T) — the reified version.
             cacheFile(symbol).writeText(json.encodeToString(cached))
         }
     }
