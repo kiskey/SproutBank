@@ -3,7 +3,6 @@ package com.sproutbank.app.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -13,6 +12,7 @@ import com.sproutbank.app.data.MarketData
 import com.sproutbank.app.data.Repository
 import com.sproutbank.app.ui.components.LineChart
 import com.sproutbank.app.ui.components.Series
+import com.sproutbank.app.ui.components.ThemedCard
 import com.sproutbank.app.vm.ChildUiState
 import com.sproutbank.app.vm.SproutViewModel
 
@@ -40,9 +40,8 @@ private fun ChartsTab(vm: SproutViewModel, state: ChildUiState) {
     var etf by remember { mutableStateOf("VOO") }
     var range by remember { mutableStateOf("90D") }
     val series: List<com.sproutbank.app.rust.PortfolioPoint> = remember(etf, range, state.ledger) {
-        runCatching {
-            vm.spendImpact(etf).unspent.takeLast(daysFor(range))
-        }.getOrDefault(emptyList())
+        runCatching { vm.spendImpact(etf).unspent.takeLast(daysFor(range)) }
+            .getOrDefault(emptyList())
     }
     LazyColumn(
         Modifier.fillMaxSize().padding(16.dp),
@@ -63,30 +62,30 @@ private fun ChartsTab(vm: SproutViewModel, state: ChildUiState) {
             }
         }
         item {
-            LineChart(
-                series = listOf(
-                    Series(
-                        label = etf,
-                        points = series.map { it.cashValueCents.toFloat() },
-                        color = MaterialTheme.colorScheme.primary,
+            ThemedCard(Modifier.fillMaxWidth()) {
+                LineChart(
+                    series = listOf(
+                        Series(
+                            label = etf,
+                            points = series.map { it.cashValueCents.toFloat() },
+                            color = MaterialTheme.colorScheme.primary,
+                        ),
                     ),
-                ),
-            )
+                )
+            }
         }
         item {
-            Card(shape = RoundedCornerShape(20.dp)) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("${etf} Return", style = MaterialTheme.typography.titleMedium)
-                    val first: Long = series.firstOrNull()?.cashValueCents ?: 0L
-                    val last: Long = series.lastOrNull()?.cashValueCents ?: 0L
-                    val delta: Long = last - first
-                    Text(
-                        Repository.money(delta),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = if (delta >= 0L) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.error,
-                    )
-                }
+            ThemedCard(Modifier.fillMaxWidth()) {
+                Text("${etf} Return", style = MaterialTheme.typography.titleMedium)
+                val first: Long = series.firstOrNull()?.cashValueCents ?: 0L
+                val last: Long = series.lastOrNull()?.cashValueCents ?: 0L
+                val delta: Long = last - first
+                Text(
+                    Repository.money(delta),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = if (delta >= 0L) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
@@ -100,35 +99,35 @@ private fun SpendImpactTab(vm: SproutViewModel, state: ChildUiState) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            LineChart(
-                series = listOf(
-                    Series(
-                        label = "Original",
-                        points = impact.unspent.map { it.cashValueCents.toFloat() },
-                        color = MaterialTheme.colorScheme.primary,
+            ThemedCard(Modifier.fillMaxWidth()) {
+                LineChart(
+                    series = listOf(
+                        Series(
+                            label = "Original",
+                            points = impact.unspent.map { it.cashValueCents.toFloat() },
+                            color = MaterialTheme.colorScheme.primary,
+                        ),
+                        Series(
+                            label = "After spends",
+                            points = impact.afterSpend.map { it.cashValueCents.toFloat() },
+                            color = MaterialTheme.colorScheme.secondary,
+                        ),
                     ),
-                    Series(
-                        label = "After spends",
-                        points = impact.afterSpend.map { it.cashValueCents.toFloat() },
-                        color = MaterialTheme.colorScheme.secondary,
-                    ),
-                ),
-            )
+                )
+            }
         }
         item {
-            Card(shape = RoundedCornerShape(20.dp)) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Opportunity Cost", style = MaterialTheme.typography.labelMedium)
-                    Text(
-                        Repository.money(impact.opportunityCostCents),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                    Text(
-                        "What your early spends gave up in ETF growth.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+            ThemedCard(Modifier.fillMaxWidth()) {
+                Text("Opportunity Cost", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    Repository.money(impact.opportunityCostCents),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Text(
+                    "What your early spends gave up in ETF growth.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
         item { Text("Fractional share sales", style = MaterialTheme.typography.titleMedium) }
@@ -162,18 +161,18 @@ private fun LearnTab(state: ChildUiState) {
         ExplainCard("SCHG", "Growth-tilted large caps; more upside, more swing.")
         ExplainCard("VT", "Whole-world market — maximum diversification.")
         ExplainCard("VTI", "Total US market — small + mid + large caps.")
-        Card(shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Ask Sprout 🤖", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
-                    value = question,
-                    onValueChange = { question = it },
-                    label = { Text("Ask about spending, ETFs, goals…") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (answer != null) {
-                    Text(answer, style = MaterialTheme.typography.bodyMedium)
-                }
+        ThemedCard(Modifier.fillMaxWidth()) {
+            Text("Ask Sprout 🤖", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = question,
+                onValueChange = { question = it },
+                label = { Text("Ask about spending, ETFs, goals…") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (answer != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(answer, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -181,11 +180,9 @@ private fun LearnTab(state: ChildUiState) {
 
 @Composable
 private fun ExplainCard(symbol: String, body: String) {
-    Card(shape = RoundedCornerShape(16.dp)) {
-        Column(Modifier.padding(12.dp)) {
-            Text(symbol, style = MaterialTheme.typography.titleSmall)
-            Text(body, style = MaterialTheme.typography.bodySmall)
-        }
+    ThemedCard(Modifier.fillMaxWidth()) {
+        Text(symbol, style = MaterialTheme.typography.titleSmall)
+        Text(body, style = MaterialTheme.typography.bodySmall)
     }
 }
 
