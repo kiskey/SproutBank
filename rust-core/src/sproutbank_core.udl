@@ -1,0 +1,75 @@
+# ====================================================================
+
+// ── Types first (must be visible before use) ──────────────────────────
+enum LedgerKind { "Credit", "Bonus", "Spend", "Redeem" };
+
+dictionary DailyPrice {
+    string symbol;
+    string date;
+    i64 close_cents;
+};
+
+dictionary LedgerEvent {
+    i64 timestamp_ms;
+    LedgerKind kind;
+    i64 amount_cents;
+    string note;
+};
+
+dictionary PortfolioPoint {
+    string date;
+    i64 cash_value_cents;
+    i64 total_credited_cents;
+};
+
+dictionary SoldSlice {
+    i64 spend_timestamp_ms;
+    string etf_symbol;
+    i64 shares_micro;
+    i64 price_cents;
+    i64 cash_cents;
+};
+
+dictionary SpendImpactResult {
+    sequence<PortfolioPoint> unspent;
+    sequence<PortfolioPoint> after_spend;
+    i64 opportunity_cost_cents;
+    sequence<SoldSlice> sold_breakdown;
+};
+
+dictionary GoalProgress {
+    i64 cash_saved_cents;
+    i64 simulated_growth_cents;
+    i64 target_cents;
+    f64 cash_ratio;
+    f64 growth_ratio;
+    i64 market_boost_cents;
+};
+
+// ── Namespace block holds the functions ───────────────────────────────
+namespace sproutbank_core {
+    sequence<PortfolioPoint> build_portfolio_series(
+        sequence<DailyPrice> prices,
+        sequence<LedgerEvent> events
+    );
+    SpendImpactResult compute_spend_impact(
+        sequence<DailyPrice> prices,
+        sequence<LedgerEvent> events
+    );
+    GoalProgress compute_goal_progress(
+        sequence<LedgerEvent> events,
+        sequence<DailyPrice> etf_prices,
+        i64 target_cents
+    );
+    sequence<DailyPrice> seed_offline_prices(
+        string symbol,
+        string start_date,
+        string end_date
+    );
+    i64 buy_shares_micro(i64 amount_cents, i64 price_cents);
+};
+
+
+
+
+# ====================================================================
